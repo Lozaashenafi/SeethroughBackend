@@ -19,7 +19,3 @@ export const logger = pino({
   redact: ['req.headers.cookie', 'req.headers.authorization'],
 });
 
-export const requestLogger = {
-  level: 'info',
-  // Used as middleware in app.ts
-};

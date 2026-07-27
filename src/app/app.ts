@@ -1,3 +1,4 @@
+import { nanoid } from 'nanoid';
 import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -9,6 +10,14 @@ import { router } from '../routes/index.js';
 import { errorHandler } from '../middlewares/error.middleware.js';
 import { notFoundHandler } from '../middlewares/notFound.middleware.js';
 
+declare global {
+  namespace Express {
+    interface Request {
+      requestId: string;
+    }
+  }
+}
+
 const app = express();
 
 app.use(helmet());
@@ -19,7 +28,8 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
 
 app.use((req, _res, next) => {
-  logger.info({ method: req.method, url: req.url, ip: req.ip }, 'Incoming request');
+  req.requestId = nanoid(12);
+  logger.info({ requestId: req.requestId, method: req.method, url: req.url, ip: req.ip }, 'Incoming request');
   next();
 });
 

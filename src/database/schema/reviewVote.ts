@@ -1,4 +1,4 @@
-import { pgTable, serial, uuid, integer, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, serial, uuid, integer, text, timestamp, uniqueIndex, index } from 'drizzle-orm/pg-core';
 import { reviews } from './review.js';
 import { anonymousIdentities } from './anonymousIdentity.js';
 
@@ -20,6 +20,6 @@ export const reviewVotes = pgTable(
       table.reviewId,
       table.anonymousId,
     ),
-    reviewIdx: uniqueIndex('idx_review_vote_review').on(table.reviewId),
+    reviewIdx: index('idx_review_vote_review').on(table.reviewId),
   }),
 );

@@ -7,3 +7,4 @@ export { reviewTags } from './reviewTag.js';
 export { reviewVotes } from './reviewVote.js';
 export { comments } from './comment.js';
 export { reports } from './report.js';
+export { admins } from './admin.js';

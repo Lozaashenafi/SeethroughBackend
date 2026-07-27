@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, serial, integer, uniqueIndex, index } from 'drizzle-orm/pg-core';
 import { reviews } from './review.js';
 import { tags } from './tag.js';
 
@@ -15,6 +15,6 @@ export const reviewTags = pgTable(
   },
   (table) => ({
     reviewTagUnique: uniqueIndex('idx_review_tag_unique').on(table.reviewId, table.tagId),
-    reviewIdx: uniqueIndex('idx_review_tag_review').on(table.reviewId),
+    reviewIdx: index('idx_review_tag_review').on(table.reviewId),
   }),
 );

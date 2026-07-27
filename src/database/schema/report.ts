@@ -33,6 +33,7 @@ export const reports = pgTable(
     publicIdIdx: index('idx_report_public_id').on(table.publicId),
     anonymousIdx: index('idx_report_anonymous').on(table.anonymousId),
     reviewIdx: index('idx_report_review').on(table.reviewId),
+    commentIdx: index('idx_report_comment').on(table.commentId),
     statusIdx: index('idx_report_status').on(table.status),
   }),
 );

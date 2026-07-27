@@ -3,6 +3,7 @@ import { db } from '../../../database/db.js';
 import { env } from '../../../config/env.js';
 import { sendSuccess } from '../../../shared/responses/index.js';
 import { sql } from 'drizzle-orm';
+import packageJson from '../../../../package.json' with { type: 'json' };
 
 class HealthController {
   async check(_req: Request, res: Response): Promise<void> {
@@ -21,7 +22,7 @@ class HealthController {
         connected: dbConnected,
       },
       uptime: process.uptime(),
-      version: '0.1.0',
+      version: packageJson.version,
       timestamp: new Date().toISOString(),
     });
   }

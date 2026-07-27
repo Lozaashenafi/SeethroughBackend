@@ -24,12 +24,8 @@ export function validate(schemas: ValidationSchemas) {
     } catch (error) {
       if (error instanceof ZodError) {
         const fieldErrors: Record<string, string[]> = {};
-        for (const issue of error.issues) {
-          const path = issue.path.join('.');
-          if (!fieldErrors[path]) {
-            fieldErrors[path] = [];
-          }
-          fieldErrors[path].push(issue.message);
+        for (const [key, messages] of Object.entries(error.flatten().fieldErrors)) {
+          if (messages) fieldErrors[key] = messages;
         }
         sendError(res, 'Validation failed', 400, fieldErrors);
         return;

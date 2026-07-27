@@ -9,13 +9,37 @@ const envSchema = z.object({
   DATABASE_URL: z.string(),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+  JWT_SECRET: z.string().optional(),
 });
 
-const parsed = envSchema.safeParse(process.env);
+function validateEnv() {
+  const parsed = envSchema.safeParse(process.env);
+  if (!parsed.success) {
+    throw new Error(
+      `Invalid environment variables: ${JSON.stringify(parsed.error.flatten().fieldErrors)}`,
+    );
+  }
 
-if (!parsed.success) {
-  console.error('Invalid environment variables:', parsed.error.flatten().fieldErrors);
-  process.exit(1);
+  const env = parsed.data;
+
+  // Require JWT_SECRET in production, provide a warning fallback in dev/test
+  if (!env.JWT_SECRET) {
+    if (env.NODE_ENV === 'production') {
+      throw new Error(
+        'JWT_SECRET environment variable is required in production. ' +
+        'Set it to a long, random string. You can generate one with: ' +
+        'openssl rand -base64 32',
+      );
+    }
+    const fallback = 'dev-secret-do-not-use-in-production';
+    console.warn(
+      '⚠️  WARNING: JWT_SECRET not set. Using insecure development fallback. ' +
+      'Set JWT_SECRET in your .env file for any non-local environment.',
+    );
+    return { ...env, JWT_SECRET: fallback };
+  }
+
+  return env as typeof env & { JWT_SECRET: string };
 }
 
-export const env = parsed.data;
+export const env = validateEnv();

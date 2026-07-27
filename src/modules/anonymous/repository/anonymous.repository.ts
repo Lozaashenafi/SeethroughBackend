@@ -1,17 +1,22 @@
-import { eq } from 'drizzle-orm';
+import { eq, and, count, desc, type SQL } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
 import { db } from '../../../database/db.js';
 import { anonymousIdentities } from '../../../database/schema/anonymousIdentity.js';
-import type { CreateAnonymousInput } from '../types/anonymous.types.js';
+import type { CreateAnonymousInput, CreateAnonymousResult } from '../types/anonymous.types.js';
+
 import type { AnonymousIdentity } from '../../../shared/types/index.js';
-import { createHash } from 'node:crypto';
+
+type AnonymousRow = AnonymousIdentity & { sessionTokenHash: string };
 
 export class AnonymousRepository {
-  private hashToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex');
-  }
+  async create(input: CreateAnonymousInput): Promise<CreateAnonymousResult> {
+    const rawSessionToken = createHash('sha256')
+      .update(Math.random().toString(36).slice(2) + Date.now().toString(36))
+      .digest('hex')
+      .slice(0, 64);
 
-  async create(input: CreateAnonymousInput): Promise<AnonymousIdentity> {
-    const sessionTokenHash = this.hashToken(input.publicId);
+    const sessionTokenHash = createHash('sha256').update(rawSessionToken).digest('hex');
+
     const [identity] = await db
       .insert(anonymousIdentities)
       .values({
@@ -19,10 +24,11 @@ export class AnonymousRepository {
         sessionTokenHash,
       })
       .returning();
-    return identity;
+
+    return { identity, rawSessionToken };
   }
 
-  async findByPublicId(publicId: string): Promise<AnonymousIdentity | null> {
+  async findByPublicId(publicId: string): Promise<AnonymousRow | null> {
     const [identity] = await db
       .select()
       .from(anonymousIdentities)
@@ -30,7 +36,7 @@ export class AnonymousRepository {
     return identity ?? null;
   }
 
-  async findById(id: string): Promise<AnonymousIdentity | null> {
+  async findById(id: string): Promise<AnonymousRow | null> {
     const [identity] = await db
       .select()
       .from(anonymousIdentities)
@@ -45,11 +51,43 @@ export class AnonymousRepository {
       .where(eq(anonymousIdentities.id, id));
   }
 
-  async markBlocked(id: string, isBlocked: boolean): Promise<void> {
-    await db
+  async findAll(params: { page: number; limit: number; status?: string }): Promise<{ data: AnonymousRow[]; total: number }> {
+    const conditions: SQL[] = [];
+
+    if (params.status && params.status !== 'all') {
+      conditions.push(eq(anonymousIdentities.status, params.status as 'active' | 'disabled' | 'flagged'));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const offset = (params.page - 1) * params.limit;
+
+    const data = await db
+      .select()
+      .from(anonymousIdentities)
+      .where(whereClause)
+      .orderBy(desc(anonymousIdentities.createdAt))
+      .limit(params.limit)
+      .offset(offset);
+
+    const [totalResult] = await db
+      .select({ total: count() })
+      .from(anonymousIdentities)
+      .where(whereClause);
+
+    return { data, total: totalResult?.total ?? 0 };
+  }
+
+  async setBlocked(id: string, isBlocked: boolean): Promise<AnonymousRow> {
+    const [identity] = await db
       .update(anonymousIdentities)
-      .set({ isBlocked })
-      .where(eq(anonymousIdentities.id, id));
+      .set({
+        isBlocked,
+        status: isBlocked ? 'disabled' : 'active',
+      })
+      .where(eq(anonymousIdentities.id, id))
+      .returning();
+
+    return identity;
   }
 }
 
