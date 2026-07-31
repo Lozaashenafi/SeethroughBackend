@@ -14,13 +14,14 @@ declare global {
 export function adminAuth() {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
+      const cookieToken = req.cookies?.admin_token as string | undefined;
       const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        sendError(res, 'Authentication required. Provide a Bearer token.', 401);
-        return;
-      }
+      const headerToken =
+        authHeader && authHeader.startsWith('Bearer ')
+          ? authHeader.slice(7)
+          : undefined;
 
-      const token = authHeader.slice(7);
+      const token = cookieToken || headerToken;
       if (!token) {
         sendError(res, 'Authentication required. Provide a Bearer token.', 401);
         return;
@@ -29,7 +30,7 @@ export function adminAuth() {
       const payload = authService.verifyToken(token);
       req.admin = payload;
       next();
-    } catch (error) {
+    } catch {
       sendError(res, 'Invalid or expired token', 401);
     }
   };

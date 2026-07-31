@@ -7,7 +7,6 @@ type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
 interface ApiOptions {
   body?: Record<string, unknown>;
-  token?: string;
   cookie?: string;
   query?: Record<string, string | number | undefined>;
 }
@@ -15,10 +14,6 @@ interface ApiOptions {
 export function apiCall(method: HttpMethod, url: string, options: ApiOptions = {}) {
   const app = getTestApp();
   const req = request(app)[method](url);
-
-  if (options.token) {
-    req.set('Authorization', `Bearer ${options.token}`);
-  }
 
   if (options.cookie) {
     req.set('Cookie', options.cookie);

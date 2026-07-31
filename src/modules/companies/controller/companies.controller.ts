@@ -1,9 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../../../shared/responses/index.js';
 import { companiesService } from '../service/companies.service.js';
+import { companyScraperService } from '../services/company-scraper.service.js';
 import { toCompanyResponse } from '../types/companies.types.js';
 
 class CompaniesController {
+  async scrape(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { website } = req.body;
+    const result = await companyScraperService.scrapeWebsite(website);
+    sendSuccess(res, result, 'Website scraped successfully');
+  }
+
   async list(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { search, industry, country, city, page, limit } = req.query as Record<string, string | undefined>;
 

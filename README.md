@@ -14,6 +14,8 @@ Anonymous workplace review platform where employees can safely share their exper
 - Every visitor gets an anonymous identity automatically
 - Controllers never worry about identity creation
 
+Administrators are the only exception: they sign in through the `auth` module, and the admin JWT is delivered via an httpOnly cookie (never exposed to JavaScript).
+
 ## Tech Stack
 
 - **Runtime:** Node.js
@@ -58,19 +60,19 @@ src/
 │   ├── health/           # Health check module
 │   │   ├── controller/
 │   │   └── routes/
-│   ├── company/          # (future)
-│   ├── review/           # (future)
-│   ├── reaction/         # (future)
-│   ├── comment/          # (future)
-│   ├── report/           # (future)
-│   ├── moderation/       # (future)
-│   └── admin/            # (future)
+│   ├── auth/             # Admin authentication (JWT via httpOnly cookie)
+│   ├── industries/       # Company industries
+│   ├── companies/        # Companies (incl. SSRF-safe website scraper)
+│   ├── reviews/          # Reviews
+│   ├── tags/             # Review tags
+│   ├── comments/         # Review comments
+│   ├── votes/            # Helpful/unhelpful votes
+│   └── reports/          # Content reports
 ├── shared/               # Shared utilities
 │   ├── constants/
 │   ├── errors/
 │   ├── responses/
 │   ├── utils/
-│   ├── validators/
 │   └── types/
 ├── routes/               # Route aggregation
 └── server.ts             # Entry point
@@ -171,6 +173,16 @@ GET /api/v1/anonymous/me
 
 Returns the current anonymous identity (requires cookie).
 
+### Admin Auth
+
+```
+POST /api/v1/auth/login
+GET  /api/v1/auth/me
+POST /api/v1/auth/logout
+```
+
+Login sets an httpOnly `admin_token` cookie (24h, SameSite=Lax); `/me` returns the current admin profile; logout clears the cookie. Admin-only routes accept the cookie or a `Authorization: Bearer <jwt>` header.
+
 ## API Versioning
 
 All endpoints are under `/api/v1/`. The architecture supports adding v2 routes without restructuring by adding a new route prefix.
@@ -222,9 +234,10 @@ mkdir -p src/modules/your-feature/{controller,service,repository,routes,validati
 ## Security
 
 - Helmet for HTTP headers
-- CORS with whitelisted origins
+- CORS with whitelisted origins and credentials
 - Rate limiting per anonymous identity
-- HTTP-only cookies (inaccessible to JavaScript)
+- HTTP-only cookies (inaccessible to JavaScript) for anonymous identity and admin auth
+- SSRF protection on the company website scraper (DNS pinning + private-range blocking)
 - Input validation at the middleware layer
 - Parameterized queries via Drizzle ORM (SQL injection protection)
 - No sensitive data stored

@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid';
 import { eq, and, desc, count, type SQL } from 'drizzle-orm';
 import { db } from '../../../database/db.js';
 import { reports } from '../../../database/schema/report.js';
+import type { ReportStatus } from '../types/reports.types.js';
 
 interface ReportRow {
   id: number;
@@ -30,7 +31,7 @@ export class ReportsRepository {
       .insert(reports)
       .values({
         publicId,
-        anonymousId: input.anonymousId as any,
+        anonymousId: input.anonymousId,
         reviewId: input.reviewId ?? null,
         commentId: input.commentId ?? null,
         reason: input.reason,
@@ -42,14 +43,14 @@ export class ReportsRepository {
   }
 
   async findAll(params: {
-    status?: string;
+    status?: ReportStatus;
     page: number;
     limit: number;
   }): Promise<{ data: ReportRow[]; total: number }> {
     const conditions: SQL[] = [];
 
     if (params.status) {
-      conditions.push(eq(reports.status, params.status as any));
+      conditions.push(eq(reports.status, params.status));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

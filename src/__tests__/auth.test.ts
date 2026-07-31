@@ -22,11 +22,49 @@ describe('Auth API', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data).toBeDefined();
-    expect(res.body.data.token).toBeDefined();
-    expect(res.body.data.token).toEqual(expect.any(String));
+    expect(res.body.data.token).toBeUndefined();
     expect(res.body.data.admin).toBeDefined();
     expect(res.body.data.admin.email).toBe(email);
     expect(res.body.data.admin.name).toBe('Admin');
+
+    const cookies = res.headers['set-cookie'];
+    const setCookie = Array.isArray(cookies) ? cookies.join('; ') : (cookies ?? '');
+    expect(setCookie).toContain('admin_token=');
+    expect(setCookie).toContain('HttpOnly');
+  });
+
+  it('GET /api/v1/auth/me - works with the httpOnly cookie', async () => {
+    const loginRes = await apiCall('post', '/api/v1/auth/login', {
+      body: { email, password },
+      cookie: anonCookie,
+    });
+    const cookies = loginRes.headers['set-cookie'];
+    const adminCookie = Array.isArray(cookies) ? cookies.join('; ') : (cookies ?? '');
+
+    const res = await apiCall('get', '/api/v1/auth/me', { cookie: adminCookie });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.email).toBe(email);
+  });
+
+  it('POST /api/v1/auth/logout - clears the admin cookie', async () => {
+    const loginRes = await apiCall('post', '/api/v1/auth/login', {
+      body: { email, password },
+      cookie: anonCookie,
+    });
+    const cookies = loginRes.headers['set-cookie'];
+    const adminCookie = Array.isArray(cookies) ? cookies.join('; ') : (cookies ?? '');
+
+    const res = await apiCall('post', '/api/v1/auth/logout', { cookie: adminCookie });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const clearedCookies = res.headers['set-cookie'];
+    const cleared = Array.isArray(clearedCookies) ? clearedCookies.join('; ') : (clearedCookies ?? '');
+    expect(cleared).toContain('admin_token=');
+    expect(cleared).toContain('Expires=Thu, 01 Jan 1970');
   });
 
   it('POST /api/v1/auth/login - fails with wrong password', async () => {

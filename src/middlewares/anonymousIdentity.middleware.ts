@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { anonymousService } from '../modules/anonymous/service/anonymous.service.js';
 import { cookieConfig } from '../config/cookies.js';
 import { logger } from '../config/logger.js';
+import { AppError } from '../shared/errors/AppError.js';
 import { ANONYMOUS_COOKIE_NAME, ANONYMOUS_SESSION_COOKIE_NAME } from '../shared/constants/index.js';
 import type { AnonymousIdentity } from '../shared/types/index.js';
 
@@ -29,6 +30,8 @@ export function anonymousIdentity() {
           if (tokenHash === identity.sessionTokenHash) {
             if (identity.isBlocked) {
               logger.warn({ publicId: existingPublicId }, 'Blocked identity attempted access');
+              next(new AppError('Your account has been blocked. If you believe this is a mistake, please contact support.', 403));
+              return;
             }
             req.anonymous = identity;
             await anonymousService.updateLastSeen(identity.id);

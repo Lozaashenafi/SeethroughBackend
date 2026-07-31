@@ -2,6 +2,7 @@ import { reportsRepository } from '../repository/reports.repository.js';
 import { reviewsRepository } from '../../reviews/repository/reviews.repository.js';
 import { commentsRepository } from '../../comments/repository/comments.repository.js';
 import { AppError } from '../../../shared/errors/AppError.js';
+import type { ReportStatus } from '../types/reports.types.js';
 
 class ReportsService {
   async create(input: {
@@ -46,7 +47,7 @@ class ReportsService {
   }
 
   async list(params: {
-    status?: string;
+    status?: ReportStatus;
     page: number;
     limit: number;
   }) {

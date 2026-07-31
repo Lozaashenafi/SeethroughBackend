@@ -1,9 +1,4 @@
-export interface CreateReportInput {
-  reviewPublicId?: string;
-  commentPublicId?: string;
-  reason: string;
-  description?: string;
-}
+export type ReportStatus = 'pending' | 'resolved' | 'dismissed';
 
 export interface ReportResponse {
   publicId: string;

@@ -11,6 +11,7 @@ import {
   companySlugParamsSchema,
   createCompanySchema,
   updateCompanySchema,
+  scrapeCompanySchema,
 } from '../validation/companies.validation.js';
 
 const companiesRoutes = Router();
@@ -21,6 +22,14 @@ companiesRoutes.get(
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ query: listCompaniesQuerySchema }),
   asyncHandler(companiesController.list.bind(companiesController)),
+);
+
+// Scrape — must come BEFORE /:slug to prevent Express from matching 'scrape' as a slug
+companiesRoutes.post(
+  '/scrape',
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ body: scrapeCompanySchema }),
+  asyncHandler(companiesController.scrape.bind(companiesController)),
 );
 
 companiesRoutes.get(

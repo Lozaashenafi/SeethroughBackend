@@ -16,40 +16,22 @@ export class VotesRepository {
     anonymousId: string;
     voteType: 'helpful' | 'unhelpful';
   }): Promise<VoteRow> {
-    // Check for existing vote
-    const [existing] = await db
-      .select()
-      .from(reviewVotes)
-      .where(
-        and(
-          eq(reviewVotes.reviewId, input.reviewId),
-          eq(reviewVotes.anonymousId, input.anonymousId as any),
-        ),
-      );
-
-    if (existing) {
-      // Update existing vote
-      const [updated] = await db
-        .update(reviewVotes)
-        .set({
-          voteType: input.voteType,
-          createdAt: new Date(),
-        })
-        .where(eq(reviewVotes.id, existing.id))
-        .returning();
-      return updated;
-    }
-
-    // Create new vote
-    const [created] = await db
+    const [vote] = await db
       .insert(reviewVotes)
       .values({
         reviewId: input.reviewId,
-        anonymousId: input.anonymousId as any,
+        anonymousId: input.anonymousId,
         voteType: input.voteType,
       })
+      .onConflictDoUpdate({
+        target: [reviewVotes.reviewId, reviewVotes.anonymousId],
+        set: {
+          voteType: input.voteType,
+          createdAt: new Date(),
+        },
+      })
       .returning();
-    return created;
+    return vote;
   }
 
   async findByReviewAndAnonymous(
@@ -62,7 +44,7 @@ export class VotesRepository {
       .where(
         and(
           eq(reviewVotes.reviewId, reviewId),
-          eq(reviewVotes.anonymousId, anonymousId as any),
+          eq(reviewVotes.anonymousId, anonymousId),
         ),
       );
     return vote ?? null;

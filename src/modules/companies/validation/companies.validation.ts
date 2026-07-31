@@ -34,3 +34,7 @@ export const updateCompanySchema = z.object({
 }).refine((data) => Object.keys(data).length > 0, {
   message: 'At least one field must be provided',
 });
+
+export const scrapeCompanySchema = z.object({
+  website: z.string().min(1, 'Website URL is required'),
+});

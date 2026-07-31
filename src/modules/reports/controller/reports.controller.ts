@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../../../shared/responses/index.js';
 import { reportsService } from '../service/reports.service.js';
-import { toReportResponse } from '../types/reports.types.js';
+import { toReportResponse, type ReportStatus } from '../types/reports.types.js';
 
 class ReportsController {
   async create(req: Request, res: Response, _next: NextFunction): Promise<void> {
@@ -13,7 +13,7 @@ class ReportsController {
   }
 
   async list(req: Request, res: Response, _next: NextFunction): Promise<void> {
-    const { status } = req.query as Record<string, string | undefined>;
+    const { status } = req.query as { status?: ReportStatus | 'all' };
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
 

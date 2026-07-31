@@ -44,7 +44,7 @@ export class CompaniesRepository {
       .values({
         name: input.name,
         slug: input.slug,
-        industryId: input.industryId as any,
+        industryId: input.industryId,
         website: input.website ?? null,
         country: input.country ?? null,
         city: input.city ?? null,

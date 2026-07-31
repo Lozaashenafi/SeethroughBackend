@@ -69,8 +69,8 @@ export class ReviewsRepository {
       .insert(reviews)
       .values({
         publicId,
-        anonymousId: input.anonymousId as any, // uuid type handling
-        companyId: input.companyId as any,
+        anonymousId: input.anonymousId,
+        companyId: input.companyId,
         title: input.title,
         pros: input.pros ?? null,
         cons: input.cons ?? null,
@@ -214,7 +214,13 @@ export class ReviewsRepository {
       ratings.length > 0
         ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
         : null;
-    const recommendationRate = allReviews.filter((r) => r.isCurrentEmployee === true).length;
+    const recommendationRate =
+      reviewCount > 0
+        ? Math.round(
+            (allReviews.filter((r) => r.isCurrentEmployee === true).length / reviewCount) *
+              100,
+          )
+        : 0;
 
     return { averageRating, reviewCount, recommendationRate };
   }

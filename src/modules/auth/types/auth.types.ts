@@ -1,8 +1,3 @@
-export interface LoginInput {
-  email: string;
-  password: string;
-}
-
 export interface AdminJwtPayload {
   adminId: number;
   email: string;
@@ -10,7 +5,6 @@ export interface AdminJwtPayload {
 }
 
 export interface LoginResponse {
-  token: string;
   admin: {
     id: number;
     email: string;
@@ -18,9 +12,8 @@ export interface LoginResponse {
   };
 }
 
-export function toLoginResponse(admin: { id: number; email: string; name: string }, token: string): LoginResponse {
+export function toLoginResponse(admin: { id: number; email: string; name: string }): LoginResponse {
   return {
-    token,
     admin: {
       id: admin.id,
       email: admin.email,

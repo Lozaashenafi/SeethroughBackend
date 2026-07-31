@@ -22,4 +22,10 @@ authRoutes.get(
   asyncHandler(authController.me.bind(authController)),
 );
 
+authRoutes.post(
+  '/logout',
+  createRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, message: 'Too many requests. Please try again later.' }),
+  asyncHandler(authController.logout.bind(authController)),
+);
+
 export { authRoutes };

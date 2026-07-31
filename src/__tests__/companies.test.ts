@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { apiCall } from './helpers.js';
 
 describe('Companies API', () => {
-  let adminToken: string;
+  let adminCookie: string;
   let anonymousCookie: string;
 
   beforeAll(async () => {
@@ -14,7 +14,8 @@ describe('Companies API', () => {
       body: { email: 'admin@seethrough.com', password: 'admin123' },
       cookie: anonymousCookie,
     });
-    adminToken = loginRes.body.data?.token ?? '';
+    const loginCookies = loginRes.headers['set-cookie'];
+    adminCookie = Array.isArray(loginCookies) ? loginCookies.join('; ') : (loginCookies ?? '');
   });
 
   it('GET /api/v1/companies - returns list of companies', async () => {
@@ -65,8 +66,7 @@ describe('Companies API', () => {
 
     const company = companies[0];
     const res = await apiCall('put', `/api/v1/companies/${company.slug}`, {
-      token: adminToken,
-      cookie: anonymousCookie,
+      cookie: adminCookie,
       body: { description: 'Updated via test' },
     });
 

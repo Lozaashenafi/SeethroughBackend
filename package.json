@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "cheerio": "^1.2.0",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
@@ -50,7 +51,8 @@
     "prettier": "^3.3.3",
     "supertest": "^7.1.0",
     "tsx": "^4.19.0",
-    "vitest": "^3.1.1",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^3.1.1"
   }
 }

@@ -2,19 +2,12 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { apiCall } from './helpers.js';
 
 describe('Reviews API', () => {
-  let adminToken: string;
   let anonymousCookie: string;
 
   beforeAll(async () => {
     const anonRes = await apiCall('get', '/api/v1/anonymous/me');
     const cookies = anonRes.headers['set-cookie'];
     anonymousCookie = Array.isArray(cookies) ? cookies.join('; ') : (cookies ?? '');
-
-    const loginRes = await apiCall('post', '/api/v1/auth/login', {
-      body: { email: 'admin@seethrough.com', password: 'admin123' },
-      cookie: anonymousCookie,
-    });
-    adminToken = loginRes.body.data?.token ?? '';
   });
 
   it('GET /api/v1/reviews - returns list of reviews (public)', async () => {

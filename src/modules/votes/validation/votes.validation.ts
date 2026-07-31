@@ -6,7 +6,3 @@ export const createVoteSchema = z.object({
     errorMap: () => ({ message: 'Vote type must be "helpful" or "unhelpful"' }),
   }),
 });
-
-export const voteParamsSchema = z.object({
-  reviewPublicId: z.string().min(1, 'Review publicId is required'),
-});

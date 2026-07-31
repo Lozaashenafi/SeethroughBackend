@@ -1,9 +1,3 @@
-export interface CreateCommentInput {
-  reviewPublicId: string;
-  content: string;
-  parentId?: number;
-}
-
 export interface CommentResponse {
   publicId: string;
   reviewId: number;

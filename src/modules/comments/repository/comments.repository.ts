@@ -28,7 +28,7 @@ export class CommentsRepository {
       .insert(comments)
       .values({
         publicId,
-        anonymousId: input.anonymousId as any,
+        anonymousId: input.anonymousId,
         reviewId: input.reviewId,
         content: input.content,
         parentId: input.parentId ?? null,

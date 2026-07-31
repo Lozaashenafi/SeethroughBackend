@@ -1,5 +1,5 @@
 import { eq, and, count, desc, type SQL } from 'drizzle-orm';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { db } from '../../../database/db.js';
 import { anonymousIdentities } from '../../../database/schema/anonymousIdentity.js';
 import type { CreateAnonymousInput, CreateAnonymousResult } from '../types/anonymous.types.js';
@@ -10,10 +10,8 @@ type AnonymousRow = AnonymousIdentity & { sessionTokenHash: string };
 
 export class AnonymousRepository {
   async create(input: CreateAnonymousInput): Promise<CreateAnonymousResult> {
-    const rawSessionToken = createHash('sha256')
-      .update(Math.random().toString(36).slice(2) + Date.now().toString(36))
-      .digest('hex')
-      .slice(0, 64);
+    // 256-bit CSPRNG token — Math.random()/Date.now() are predictable and weak.
+    const rawSessionToken = randomBytes(32).toString('base64url');
 
     const sessionTokenHash = createHash('sha256').update(rawSessionToken).digest('hex');
 
