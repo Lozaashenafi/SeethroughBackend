@@ -11,13 +11,28 @@ import { anonymousIdentities } from './schema/anonymousIdentity.js';
 import { reviews } from './schema/review.js';
 import { reviewTags } from './schema/reviewTag.js';
 import { logger } from '../config/logger.js';
+import { env } from '../config/env.js';
 
-async function seed() {
+/**
+ * Helper to generate URL-safe slugs.
+ * Supports English and Ethiopic (Amharic) characters.
+ */
+const generateSlug = (text: string): string => {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-") 
+    .replace(/[^\w\u1200-\u137F-]+/g, "") 
+    .replace(/\-\-+/g, "-") 
+    .concat("-" + Math.random().toString(36).substring(2, 7)); // Ensure uniqueness
+};
+
+async function seed(): Promise<void> {
   logger.info('🌱 Starting database seed...');
 
   // ─── 1. Industries ───
   logger.info('  Seeding industries...');
-
   const industryData = [
     { name: 'Technology', slug: 'technology' },
     { name: 'Finance', slug: 'finance' },
@@ -42,17 +57,12 @@ async function seed() {
   ];
 
   for (const industry of industryData) {
-    await db
-      .insert(industries)
-      .values(industry)
-      .onConflictDoNothing({ target: industries.slug });
+    await db.insert(industries).values(industry).onConflictDoNothing({ target: industries.slug });
   }
-
   logger.info(`  ✓ ${industryData.length} industries seeded`);
 
   // ─── 2. Tags ───
   logger.info('  Seeding tags...');
-
   const tagData = [
     { name: 'Good Culture', slug: 'good-culture' },
     { name: 'Great Benefits', slug: 'great-benefits' },
@@ -72,321 +82,296 @@ async function seed() {
   ];
 
   for (const tag of tagData) {
-    await db
-      .insert(tags)
-      .values(tag)
-      .onConflictDoNothing({ target: tags.slug });
+    await db.insert(tags).values(tag).onConflictDoNothing({ target: tags.slug });
   }
-
   logger.info(`  ✓ ${tagData.length} tags seeded`);
 
   // ─── 3. Admin ───
-  logger.info('  Seeding admin user...');
+  // Credentials come from env (ADMIN_EMAIL / ADMIN_PASSWORD) with safe dev defaults.
+  const passwordHash = await bcrypt.hash(env.ADMIN_PASSWORD, 10);
+  await db.insert(admins).values({
+    email: env.ADMIN_EMAIL,
+    passwordHash,
+    name: 'Admin',
+  }).onConflictDoNothing({ target: admins.email });
+  logger.info(`  ✓ Admin user seeded (${env.ADMIN_EMAIL})`);
 
-  const passwordHash = await bcrypt.hash('admin123', 10);
-  await db
-    .insert(admins)
-    .values({
-      email: 'admin@seethrough.com',
-      passwordHash,
-      name: 'Admin',
-    })
-    .onConflictDoNothing({ target: admins.email });
-
-  logger.info('  ✓ Admin user seeded (admin@seethrough.com / admin123)');
-
-  // ─── 4. Sample Companies ───
-  logger.info('  Seeding sample companies...');
-
+  // ─── 4. Sample Global Companies (Required for sample reviews) ───
   const allIndustries = await db.select().from(industries);
-  const industryMap = Object.fromEntries(
+  const industryMap: Record<string, string> = Object.fromEntries(
     allIndustries.map((i) => [i.slug, i.id]),
   );
 
-  const companyData = [
+  // Fallback industry for companies without a detected match ('consulting').
+  const defaultIndustryId: string = industryMap['consulting'] ?? allIndustries[0]!.id;
+
+  const sampleGlobalData = [
+    { name: 'Google', slug: 'google', industrySlug: 'technology', country: 'USA', city: 'Mountain View' },
+    { name: 'Stripe', slug: 'stripe', industrySlug: 'finance', country: 'USA', city: 'San Francisco' },
+    { name: 'Amazon', slug: 'amazon', industrySlug: 'e-commerce', country: 'USA', city: 'Seattle' },
+    { name: 'Netflix', slug: 'netflix', industrySlug: 'media-entertainment', country: 'USA', city: 'Los Gatos' },
+  ];
+
+  for (const c of sampleGlobalData) {
+    await db.insert(companies).values({
+      name: c.name,
+      slug: c.slug,
+      industryId: industryMap[c.industrySlug] ?? defaultIndustryId,
+      country: c.country,
+      city: c.city,
+      verified: true,
+    }).onConflictDoNothing({ target: companies.slug });
+  }
+
+  // ─── 5. High-Quality Tech Company Information (Researched) ───
+  logger.info('  Seeding researched tech companies...');
+  const detailedTechCompanies = [
     {
-      name: 'Google',
-      slug: 'google',
+      name: 'AIT Technologies',
+      slug: 'ait-technologies',
+      website: 'https://ait.technology',
       industrySlug: 'technology',
-      website: 'https://google.com',
-      country: 'United States',
-      city: 'Mountain View',
-      description: 'Global technology leader in internet services, AI, and cloud computing.',
+      description:
+        'Leading Ethiopian BPO, call center, and software development provider specializing in digital transformation.',
       verified: true,
     },
     {
-      name: 'Stripe',
-      slug: 'stripe',
+      name: 'Ablaze It Laboratories And Engineering PLC',
+      slug: 'ablaze-it-laboratories',
+      website: 'https://www.ablazelabs.com',
       industrySlug: 'technology',
-      website: 'https://stripe.com',
-      country: 'United States',
-      city: 'San Francisco',
-      description: 'Online payment processing platform for internet businesses.',
+      description:
+        'A pioneering startup studio and technology firm focusing on custom software and IT outsourcing.',
       verified: true,
     },
     {
-      name: 'Goldman Sachs',
-      slug: 'goldman-sachs',
-      industrySlug: 'finance',
-      website: 'https://goldmansachs.com',
-      country: 'United States',
-      city: 'New York',
-      description: 'Leading global investment banking and securities firm.',
+      name: 'AddisFly',
+      slug: 'addisfly',
+      website: 'https://addisfly.com',
+      industrySlug: 'hospitality-tourism',
+      description:
+        'IATA-accredited digital travel agency for instant flight bookings and diaspora travel services.',
       verified: true,
     },
     {
-      name: 'Mayo Clinic',
-      slug: 'mayo-clinic',
-      industrySlug: 'healthcare',
-      website: 'https://mayoclinic.org',
-      country: 'United States',
-      city: 'Rochester',
-      description: 'Non-profit academic medical center for clinical practice, education, and research.',
+      name: 'Afriwork Recruitment',
+      slug: 'afriwork-recruitment',
+      website: 'https://afriwork.com',
+      industrySlug: 'consulting',
+      description: "Ethiopia's largest talent marketplace connecting professionals with top employers.",
       verified: true,
     },
     {
-      name: 'Tesla',
-      slug: 'tesla',
+      name: 'Dodai Manufacturing PLC',
+      slug: 'dodai-manufacturing',
+      website: 'https://dodai.co',
       industrySlug: 'manufacturing',
-      website: 'https://tesla.com',
-      country: 'United States',
-      city: 'Austin',
-      description: 'Electric vehicle and clean energy company.',
+      description:
+        "Electric vehicle and mobility infrastructure company building Africa's largest battery swapping network.",
       verified: true,
     },
     {
-      name: 'Amazon',
-      slug: 'amazon',
-      industrySlug: 'e-commerce',
-      website: 'https://amazon.com',
-      country: 'United States',
-      city: 'Seattle',
-      description: 'Global e-commerce, cloud computing, and digital streaming company.',
+      name: 'Chapa Financial Technologies',
+      slug: 'chapa-financial-technologies',
+      website: 'https://chapa.co',
+      industrySlug: 'finance',
+      description:
+        'Leading online payment gateway enabling businesses in Ethiopia to accept local and international payments.',
       verified: true,
     },
     {
-      name: 'Netflix',
-      slug: 'netflix',
-      industrySlug: 'media-entertainment',
-      website: 'https://netflix.com',
-      country: 'United States',
-      city: 'Los Gatos',
-      description: 'Global streaming entertainment service.',
+      name: 'LakiPay Financial Technologies S.C',
+      slug: 'lakipay-financial-technologies',
+      website: 'https://lakipay.com',
+      industrySlug: 'finance',
+      description:
+        'AI-powered superapp and licensed payment system operator for remittances and commerce.',
       verified: true,
     },
     {
-      name: 'Shopify',
-      slug: 'shopify',
-      industrySlug: 'e-commerce',
-      website: 'https://shopify.com',
-      country: 'Canada',
-      city: 'Ottawa',
-      description: 'Leading e-commerce platform for online stores and retail systems.',
-      verified: false,
+      name: 'ZayRide',
+      slug: 'zayride',
+      website: 'https://zayride.com',
+      industrySlug: 'transportation-logistics',
+      description:
+        'Customer-centric on-demand taxi, delivery, and ambulance service provider in Addis Ababa.',
+      verified: true,
+    },
+    {
+      name: 'Gebeya',
+      slug: 'gebeya',
+      website: 'https://gebeya.com',
+      industrySlug: 'technology',
+      description:
+        "SaaS-enabled marketplace connecting Africa's best tech talent with global opportunities.",
+      verified: true,
+    },
+    {
+      name: 'Transsion Manufacturing Plc.',
+      slug: 'transsion-manufacturing',
+      website: 'https://www.transsion.com',
+      industrySlug: 'manufacturing',
+      description:
+        'Global mobile phone manufacturer (TECNO, Infinix, Itel) with significant operations in Ethiopia.',
+      verified: true,
     },
   ];
 
-  let companiesSeeded = 0;
-  for (const company of companyData) {
-    const industryId = industryMap[company.industrySlug];
-    if (!industryId) {
-      logger.warn(`  ⚠ No industry found for slug "${company.industrySlug}", skipping ${company.name}`);
-      continue;
-    }
-
-    await db
-      .insert(companies)
-      .values({
-        name: company.name,
-        slug: company.slug,
-        industryId,
-        website: company.website,
-        country: company.country,
-        city: company.city,
-        description: company.description,
-        verified: company.verified,
-      })
-      .onConflictDoNothing({ target: companies.slug });
-    companiesSeeded++;
+  for (const c of detailedTechCompanies) {
+    await db.insert(companies).values({
+      name: c.name,
+      slug: c.slug,
+      industryId: industryMap[c.industrySlug] ?? defaultIndustryId,
+      website: c.website,
+      description: c.description,
+      country: 'Ethiopia',
+      city: 'Addis Abeba',
+      verified: c.verified,
+    }).onConflictDoNothing({ target: companies.slug });
   }
+  logger.info(`  ✓ ${detailedTechCompanies.length} researched tech companies seeded`);
 
-  logger.info(`  ✓ ${companiesSeeded} companies seeded`);
+  // ─── 6. Bulk Ethiopian Companies ───
+  logger.info('  Seeding Ethiopian company list...');
+  const ethiopianCompanyNames = [
+    "A AND S PILLAR TRADING", "ADDIS PROPERTY MARKETING GROUP PLC", "AIT Technologies", "AND TRADING PLC",
+    "AR SOLUTION TRADING PLC", "ARKI PLASTIC PRODUCTS FACTORY PLC", "AT GLOBAL BUSINESS PLC", "Abbay Media",
+    "Ablaze It Laboratories And Engineering PLC", "Addis Finder trading plc", "AddisFly", "Adiamat Trading Plc",
+    "Afri Flame holding", "Afriwork Recruitment", "Akoya Properties", "Alhabek Trading PLC", "Alloy Aluminum Trading PLC",
+    "Amrogn Chicken", "Aquila ICT Solution", "Arfen Trading PLC.", "Avi Impex trading plc", "Awura Computing PLC",
+    "B D A BUSINESS AND AGRICULTURAL DEVELOPMENT PLC", "BANEOL GENERAL CONSTRUCTION AND TRADE PLC", "BEZAW CURBSIDE PLC",
+    "BRONQ ENGLISH LANGUAGE SCHOOL", "BUILDERS CREAMY TRADING PLC", "Bemistre Furnishings and Interior", "BeteSeb Academy",
+    "Bilos Pastry PLC", "Biniyam Tsegaye internet café", "Blih Marketing and Communications plc", "Bora Integrated Commercial Farm Plc",
+    "Boutique", "Brana Gospel Focus Ministry", "Bright Techno Tonic plc", "CHINET LINK TECH ONE MEMBER P L C",
+    "CONTINENTAL PRINTERS PLC", "Chipchip E-commerce Platform", "Cosmic Technologies", "DLM PLC", "Dagi Spa",
+    "Dema Hope Real Estate", "Dipcom Technology Institute", "Dodai Manufacturing PLC", "Dongtang Business Consultancy PLC.",
+    "Dr Abel Specialty Dental Clinic", "Dream Technologies Plc", "Dynamic Planners PLC", "EASE Engineering PLC",
+    "Easy Production", "Esubalew Workineh Tegegne", "Ethio America academy", "FAMTRA TRADING PLC", "FG Business group 8085",
+    "Fidel", "G POWER MANUFACTURING PLC", "GROUP PLC", "Golden Design", "Gouldon import and export",
+    "Haset Information Technology PLC", "Hashtag Advertising", "Horizon Trading plc", "Hulucare Dermatology and Aesthetics Specialized Clinic",
+    "Information Systems Services PLC", "JUNTU TECHNOLOGY TRADING PLC", "Jasper Ethiopia Business Group", "KLIK INVESTMENT PLC",
+    "Kefeta Training and Consulting PLC", "Kefyalew pharmaceuticals and medical supplies", "Kelem Educational Consultancy P.L.C",
+    "Kinetic Dawn Multimedia", "Komari Beverage", "LIANA HEALTH CARE", "LakiPay Financial Technologies S.C",
+    "Lavoca Trading PLC", "Le Solution PLC", "Leapfrog Software Technology Africa Plc", "LeuNet ICT Solutions",
+    "LucyBridge PLC", "Lumen Communication Marketing And Technologies PLC", "M Advertising activities", "MAG PLASTIC PLC",
+    "MELA EXPRESS DELIVERY", "MELO DERMATOLOGY AND SKINCARE TRANDING  PLC", "MENAB TRADING PLC", "MODETH Outsource P.L.C",
+    "MORESAFE ETHIOPIA ELECTRICAL EQUPMENT IMPORT", "MRKY TRADING PLC", "MUBAREK AHMED HUSSEN", "Mamokacha PLC ማሞ ካቻ ኃ/የተ/የግ/ማህበር",
+    "Manna Diagnostic Center", "Maraki English", "Marselam Trading PLC", "Melke tour and travel agency", "Mesob Studios Plc.",
+    "Metropolitan Real Estate Plc", "Misrak Food complex plc", "Moringa Farms plc", "Nathan general trading plc",
+    "Netsa Trading PLC", "Noble Homes", "On Point Management Solutions", "Phoenix Telecom Plc", "Prime Medicare PLC",
+    "Private Client", "Prokal Technologies Solutions", "REDAT HEALTH CARE PLC", "Reality Share Company", "Repi Soap & Detergent PLC",
+    "Rise Addis Properties Plc", "Royal Real Estate", "Ruftana Trading plc", "SACON CONSTRUCTION AND TRADING PLC",
+    "SAL Trading PLC", "SANTE MEDICAL CENTER", "SARIA CONSULTANCY P L C", "SCHOOL PLC", "SHI-FAM TRADING PLC",
+    "SOKA IMPORT PLC", "Selam General Hospital", "Sheger Wedding Store", "Silicon labs", "Skylight Technology Group PLC",
+    "Slope  Construction & Trade", "Social Impact Trading Plc", "Sorana Industry and Engineering PLC", "TENSAE DEMISSIE JUFFAR",
+    "TUTU NOODLES", "TWO TWENTY PARTNERS DESIGN AND CONSTRUCTION PLC", "Tbab Trading PLC", "Tech Equations Technology",
+    "Tedla Ambulance", "Tekeba & Friends Property Valuation and Management PLC", "Tekeste Zerihun general contractor",
+    "Tewos Trading PLC", "Tigat Saving and Credit Coop", "Tongfang system Integration p.l.c", "Top training institute",
+    "Transsion Manufacturing Plc.", "Trego X Trading PLC", "Trident Engineering Plc", "UNI MAS ENGENRING PLC",
+    "Uplift Solution", "Vector four engineering plc", "WANGO IMPORT AND EXPORT", "WETRUCK TECHENABLE SOLUTION",
+    "Winner Pipes", "Ximar Concrete manufacturing plc", "YES TRADING PLC", "YONAB FAMILY TRADING PLC", "YONATAN BT PLC",
+    "Yimaru Academy PLC", "Zagol system", "Zainx technology plc", "Zer trading plc", "Zota Engineering PLC",
+    "benol pharmaceuticals plc", "ennovo software development plc", "gheero", "iSON xperiecnes Ethiocall PLC",
+    "irack IT Solution", "noah real estate plc", "wavelet Engineering PLC", "wb interior", "ሸዋ ሆምስ ሪል እስቴት",
+    "አስናቀ ማስታወቅያ", "ዘ ታቦር ትሬዲንግ ኃላፊነቱ የተወሰነ የግል ማህበር", "ደመራ ኢንጅነሪንግና ኮንስትራክሽን",
+    "ድል የገንዘብ ቁጠባና ብድር ኃላፊነቱ የተወሰነ የህብረት ሥራ ማኅበር"
+  ];
 
-  // ─── 5. Anonymous Identity ───
-  logger.info('  Seeding anonymous identity for sample reviews...');
+  // We link these to 'Consulting' or 'General Business'. Using 'consulting' as a safe fallback.
+  // Skip companies already seeded above (e.g. the researched tech companies) to avoid duplicates.
+  const existingCompanyNames = new Set(
+    (await db.select({ name: companies.name }).from(companies)).map((c) =>
+      c.name.trim().toLowerCase(),
+    ),
+  );
+  const newEthiopianNames = ethiopianCompanyNames.filter(
+    (name) => !existingCompanyNames.has(name.trim().toLowerCase()),
+  );
 
+  const ethiopianPrepared = newEthiopianNames.map((name) => ({
+    name,
+    slug: generateSlug(name),
+    industryId: defaultIndustryId,
+    country: "Ethiopia",
+    city: "Addis Abeba",
+    verified: false,
+  }));
+
+  const chunkSize = 50;
+  for (let i = 0; i < ethiopianPrepared.length; i += chunkSize) {
+    const chunk = ethiopianPrepared.slice(i, i + chunkSize);
+    await db.insert(companies).values(chunk).onConflictDoNothing();
+  }
+  logger.info(`  ✓ ${newEthiopianNames.length} Ethiopian companies seeded`);
+
+  // ─── 7. Anonymous Identity ───
   const sessionToken = nanoid(32);
   const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
+  const [anonIdentity] = await db.insert(anonymousIdentities).values({
+    publicId: nanoid(16),
+    sessionTokenHash: tokenHash,
+  }).onConflictDoNothing({ target: anonymousIdentities.publicId }).returning();
 
-  const [anonIdentity] = await db
-    .insert(anonymousIdentities)
-    .values({
-      publicId: nanoid(16),
-      sessionTokenHash: tokenHash,
-    })
-    .onConflictDoNothing({ target: anonymousIdentities.publicId })
-    .returning();
-
-  // ─── 6. Sample Reviews (insert only, no stats update yet) ───
-  const allCompanies = await db.select().from(companies);
   const anonId = anonIdentity?.id ?? (await db.select().from(anonymousIdentities).limit(1))[0]?.id;
 
-  if (anonId && allCompanies.length > 0) {
+  // ─── 8. Sample Reviews ───
+  if (anonId) {
     const reviewData = [
-      {
-        companySlug: 'google',
-        title: 'Great place for engineers, but politics can be tough',
-        pros: 'Excellent compensation, amazing perks, smart colleagues, great learning opportunities.',
-        cons: 'Promotion process is slow and political. Large company bureaucracy can be frustrating.',
-        overallRating: 4,
-        workLifeBalance: 3,
-        culture: 4,
-        management: 3,
-        compensation: 5,
-        opportunities: 4,
-        jobTitle: 'Senior Software Engineer',
-        employmentStatus: 'full-time' as const,
-        isCurrentEmployee: true,
-        tagNames: ['Good Culture', 'Great Benefits', 'Fair Compensation'],
-      },
-      {
-        companySlug: 'stripe',
-        title: 'Best engineering culture I have experienced',
-        pros: 'Incredibly smart team, excellent engineering practices, great developer experience. Remote-first culture done right.',
-        cons: 'Can be intense during product launches. On-call rotation can be draining.',
-        overallRating: 5,
-        workLifeBalance: 4,
-        culture: 5,
-        management: 4,
-        compensation: 5,
-        opportunities: 4,
-        jobTitle: 'Software Engineer',
-        employmentStatus: 'full-time' as const,
-        isCurrentEmployee: true,
-        tagNames: ['Good Culture', 'Work-Life Balance', 'Great Mentorship', 'Remote Friendly'],
-      },
-      {
-        companySlug: 'amazon',
-        title: 'High pay but brutal environment',
-        pros: 'Competitive salary and benefits. Massive scale provides unique learning opportunities.',
-        cons: 'Extremely high pressure culture. PIP culture creates constant stress. Work-life balance is poor.',
-        overallRating: 3,
-        workLifeBalance: 2,
-        culture: 2,
-        management: 2,
-        compensation: 5,
-        opportunities: 4,
-        jobTitle: 'Software Development Engineer',
-        employmentStatus: 'full-time' as const,
-        isCurrentEmployee: false,
-        tagNames: ['Fair Compensation', 'Fast Paced', 'Toxic Environment', 'Long Hours'],
-      },
-      {
-        companySlug: 'netflix',
-        title: 'Freedom and responsibility at its finest',
-        pros: 'Freedom to make decisions without layers of approval. Highly talented peers. Compensation is among the best in the industry.',
-        cons: 'Very high expectations. Performance culture means constant pressure. Job security is lower than typical.',
-        overallRating: 4,
-        workLifeBalance: 3,
-        culture: 4,
-        management: 4,
-        compensation: 5,
-        opportunities: 3,
-        jobTitle: 'Senior Product Manager',
-        employmentStatus: 'full-time' as const,
-        isCurrentEmployee: true,
-        tagNames: ['Good Culture', 'Innovation', 'Fair Compensation', 'Team Collaboration'],
-      },
+      { companySlug: 'google', title: 'Great place for engineers', overallRating: 4, tagNames: ['Good Culture', 'Great Benefits'] },
+      { companySlug: 'stripe', title: 'Best engineering culture', overallRating: 5, tagNames: ['Good Culture', 'Remote Friendly'] },
+      { companySlug: 'amazon', title: 'High pay but brutal', overallRating: 3, tagNames: ['Toxic Environment', 'Long Hours'] },
+      { companySlug: 'netflix', title: 'Freedom and responsibility', overallRating: 4, tagNames: ['Innovation', 'Fair Compensation'] },
     ];
 
-    // Fetch all tags once
     const allTags = await db.select().from(tags);
-    const tagMap = Object.fromEntries(allTags.map((t) => [t.name, t.id]));
-    let reviewsSeeded = 0;
+    const tagMap: Record<string, number> = Object.fromEntries(
+      allTags.map((t) => [t.name, t.id]),
+    );
+    const seededCompanies = await db.select().from(companies);
 
     for (const review of reviewData) {
-      const company = allCompanies.find((c) => c.slug === review.companySlug);
-      if (!company) {
-        logger.warn(`  ⚠ Company not found: ${review.companySlug}, skipping review`);
-        continue;
-      }
+      const company = seededCompanies.find((c) => c.slug === review.companySlug);
+      if (!company) continue;
 
-      // Use deterministic publicId so the seed is idempotent on re-runs
-      const reviewPublicId = `seed-${review.companySlug}`;
-      const [insertedReview] = await db
-        .insert(reviews)
-        .values({
-          publicId: reviewPublicId,
-          anonymousId: anonId,
-          companyId: company.id,
-          title: review.title,
-          pros: review.pros,
-          cons: review.cons,
-          overallRating: review.overallRating,
-          workLifeBalance: review.workLifeBalance,
-          culture: review.culture,
-          management: review.management,
-          compensation: review.compensation,
-          opportunities: review.opportunities,
-          isCurrentEmployee: review.isCurrentEmployee,
-          employmentStatus: review.employmentStatus,
-          jobTitle: review.jobTitle,
-        })
-        .onConflictDoNothing({ target: reviews.publicId })
-        .returning();
+      const [insertedReview] = await db.insert(reviews).values({
+        publicId: `seed-${review.companySlug}`,
+        anonymousId: anonId,
+        companyId: company.id,
+        title: review.title,
+        pros: 'Pros list here...',
+        cons: 'Cons list here...',
+        overallRating: review.overallRating,
+        isCurrentEmployee: true,
+        employmentStatus: 'full-time',
+        jobTitle: 'Software Engineer',
+      }).onConflictDoNothing().returning();
 
-      if (!insertedReview) {
-        logger.info(`  ⏭ Review already exists for ${review.companySlug}, skipping`);
-        continue;
-      }
-      reviewsSeeded++;
-
-      // Link tags to the review (no onConflict needed — each review+tag combo is unique by design in a seed)
-      for (const tagName of review.tagNames) {
-        const tagId = tagMap[tagName];
-        if (tagId) {
-          await db.insert(reviewTags).values({ reviewId: insertedReview.id, tagId });
+      if (insertedReview) {
+        for (const tagName of review.tagNames) {
+          const tagId = tagMap[tagName];
+          if (tagId) await db.insert(reviewTags).values({ reviewId: insertedReview.id, tagId });
         }
       }
     }
+  }
 
-    logger.info(`  ✓ ${reviewsSeeded} sample reviews seeded`);
+  // ─── 9. Consolidate Stats ───
+  logger.info('  Consolidating stats...');
+  const finalCompanies = await db.select().from(companies);
+  for (const company of finalCompanies) {
+    const companyReviews = await db.select().from(reviews).where(eq(reviews.companyId, company.id));
+    if (companyReviews.length === 0) continue;
 
-    // ─── 7. Consolidate company review stats ───
-    logger.info('  Consolidating company review stats...');
-    for (const company of allCompanies) {
-      const companyReviews = await db
-        .select({
-          overallRating: reviews.overallRating,
-          isCurrentEmployee: reviews.isCurrentEmployee,
-        })
-        .from(reviews)
-        .where(eq(reviews.companyId, company.id));
+    const ratings = companyReviews
+      .map((r) => r.overallRating)
+      .filter((r): r is number => r !== null && r !== undefined);
+    if (ratings.length === 0) continue;
+    const avg = (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1);
 
-      if (companyReviews.length === 0) continue;
-
-      const ratings = companyReviews
-        .filter((r): r is { overallRating: number; isCurrentEmployee: boolean | null } => r.overallRating !== null)
-        .map((r) => r.overallRating);
-
-      const avg = ratings.length > 0
-        ? String((ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1))
-        : '0';
-
-      const currentEmployees = companyReviews.filter((r) => r.isCurrentEmployee === true).length;
-
-      await db
-        .update(companies)
-        .set({
-          reviewCount: companyReviews.length,
-          averageRating: avg,
-          recommendationRate: currentEmployees,
-        })
-        .where(eq(companies.id, company.id));
-    }
-    logger.info('  ✓ Company stats consolidated');
-  } else {
-    logger.info('  ⏭ Skipping sample reviews (no anonymous identity or companies available)');
+    await db.update(companies).set({
+      reviewCount: companyReviews.length,
+      averageRating: avg,
+    }).where(eq(companies.id, company.id));
   }
 
   logger.info('✅ Seed complete!');

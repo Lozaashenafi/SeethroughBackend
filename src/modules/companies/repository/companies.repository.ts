@@ -1,6 +1,11 @@
-import { eq, and, ilike, or, desc, count, type SQL } from 'drizzle-orm';
+import { eq, and, ilike, or, desc, count, inArray, type SQL } from 'drizzle-orm';
 import { db } from '../../../database/db.js';
 import { companies } from '../../../database/schema/company.js';
+import { reviews } from '../../../database/schema/review.js';
+import { comments } from '../../../database/schema/comment.js';
+import { reviewVotes } from '../../../database/schema/reviewVote.js';
+import { reviewTags } from '../../../database/schema/reviewTag.js';
+import { reports } from '../../../database/schema/report.js';
 
 interface CompanyRow {
   id: string;
@@ -79,12 +84,51 @@ export class CompaniesRepository {
   }
 
   async delete(slug: string): Promise<boolean> {
-    const [deleted] = await db
-      .delete(companies)
-      .where(eq(companies.slug, slug))
-      .returning({ id: companies.id });
+    // Cascade delete in a single transaction: child records must be removed
+    // before the company itself to avoid FK constraint violations.
+    return db.transaction(async (tx) => {
+      const [company] = await tx
+        .select({ id: companies.id })
+        .from(companies)
+        .where(eq(companies.slug, slug))
+        .limit(1);
+      if (!company) return false;
 
-    return !!deleted;
+      // All reviews belonging to this company
+      const companyReviews = await tx
+        .select({ id: reviews.id })
+        .from(reviews)
+        .where(eq(reviews.companyId, company.id));
+      const reviewIds = companyReviews.map((r) => r.id);
+
+      if (reviewIds.length > 0) {
+        // Comments on those reviews (for reports that reference them)
+        const reviewComments = await tx
+          .select({ id: comments.id })
+          .from(comments)
+          .where(inArray(comments.reviewId, reviewIds));
+        const commentIds = reviewComments.map((c) => c.id);
+
+        // Reports may reference the review directly or one of its comments
+        const reportConditions: SQL[] = [inArray(reports.reviewId, reviewIds)];
+        if (commentIds.length > 0) {
+          reportConditions.push(inArray(reports.commentId, commentIds));
+        }
+
+        await tx.delete(reports).where(or(...reportConditions));
+        await tx.delete(comments).where(inArray(comments.reviewId, reviewIds));
+        await tx.delete(reviewVotes).where(inArray(reviewVotes.reviewId, reviewIds));
+        await tx.delete(reviewTags).where(inArray(reviewTags.reviewId, reviewIds));
+        await tx.delete(reviews).where(inArray(reviews.id, reviewIds));
+      }
+
+      const [deleted] = await tx
+        .delete(companies)
+        .where(eq(companies.slug, slug))
+        .returning({ id: companies.id });
+
+      return !!deleted;
+    });
   }
 
   async findAll(params: ListCompaniesParams): Promise<{ data: CompanyRow[]; total: number }> {

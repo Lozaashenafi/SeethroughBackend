@@ -1,4 +1,4 @@
-import { eq, desc, count, sql } from 'drizzle-orm';
+import { eq, desc, count, sql, inArray, or, type SQL } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { db } from '../../../database/db.js';
 import { reviews } from '../../../database/schema/review.js';
@@ -146,17 +146,33 @@ export class ReviewsRepository {
     const review = await this.findByPublicId(publicId);
     if (!review) return false;
 
-    // Delete child records first to avoid FK violations
-    await db.delete(comments).where(eq(comments.reviewId, review.id));
-    await db.delete(reviewVotes).where(eq(reviewVotes.reviewId, review.id));
-    await db.delete(reviewTags).where(eq(reviewTags.reviewId, review.id));
-    await db.delete(reports).where(eq(reports.reviewId, review.id));
+    // Cascade delete in a single transaction for atomicity
+    return db.transaction(async (tx) => {
+      // Collect comment IDs so reports referencing them can be removed too
+      const reviewComments = await tx
+        .select({ id: comments.id })
+        .from(comments)
+        .where(eq(comments.reviewId, review.id));
+      const commentIds = reviewComments.map((c) => c.id);
 
-    const [deleted] = await db
-      .delete(reviews)
-      .where(eq(reviews.publicId, publicId))
-      .returning({ id: reviews.id });
-    return !!deleted;
+      // Delete child records first to avoid FK violations.
+      // Reports may reference the review directly or one of its comments.
+      const reportConditions: SQL[] = [eq(reports.reviewId, review.id)];
+      if (commentIds.length > 0) {
+        reportConditions.push(inArray(reports.commentId, commentIds));
+      }
+
+      await tx.delete(reports).where(or(...reportConditions));
+      await tx.delete(comments).where(eq(comments.reviewId, review.id));
+      await tx.delete(reviewVotes).where(eq(reviewVotes.reviewId, review.id));
+      await tx.delete(reviewTags).where(eq(reviewTags.reviewId, review.id));
+
+      const [deleted] = await tx
+        .delete(reviews)
+        .where(eq(reviews.publicId, publicId))
+        .returning({ id: reviews.id });
+      return !!deleted;
+    });
   }
 
   async updateCounts(

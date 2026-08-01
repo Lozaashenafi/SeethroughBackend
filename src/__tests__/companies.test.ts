@@ -90,4 +90,64 @@ describe('Companies API', () => {
 
     expect(res.status).toBe(401);
   });
+
+  it('DELETE /api/v1/companies/:slug - admin can delete a company with reviews and comments (cascade)', async () => {
+    // Fetch a valid industry ID
+    const industriesRes = await apiCall('get', '/api/v1/industries', { cookie: anonymousCookie });
+    const industries = industriesRes.body.data ?? [];
+    if (industries.length === 0) return;
+    const industryId = industries[0].id;
+
+    const slug = `cascade-test-${Date.now()}`;
+
+    // Create a company
+    const createRes = await apiCall('post', '/api/v1/companies', {
+      cookie: anonymousCookie,
+      body: {
+        name: `Cascade Test ${Date.now()}`,
+        slug,
+        industryId,
+        country: 'Testland',
+      },
+    });
+    expect(createRes.status).toBe(201);
+
+    // Add a review to the company
+    const reviewRes = await apiCall('post', '/api/v1/reviews', {
+      cookie: anonymousCookie,
+      body: {
+        companySlug: slug,
+        title: 'Cascade delete review',
+        pros: 'Good',
+        cons: 'Bad',
+        overallRating: 4,
+        employmentStatus: 'full-time',
+        jobTitle: 'Engineer',
+      },
+    });
+    expect(reviewRes.status).toBe(201);
+    const reviewPublicId = reviewRes.body.data?.publicId;
+    expect(reviewPublicId).toBeDefined();
+
+    // Add a comment to the review
+    const commentRes = await apiCall('post', '/api/v1/comments', {
+      cookie: anonymousCookie,
+      body: { reviewPublicId, content: 'A cascade test comment' },
+    });
+    expect(commentRes.status).toBe(201);
+
+    // Delete the company as admin — should cascade without FK violations
+    const deleteRes = await apiCall('delete', `/api/v1/companies/${slug}`, {
+      cookie: adminCookie,
+    });
+
+    expect(deleteRes.status).toBe(200);
+    expect(deleteRes.body.success).toBe(true);
+
+    // Company should be gone
+    const getRes = await apiCall('get', `/api/v1/companies/${slug}`, {
+      cookie: anonymousCookie,
+    });
+    expect(getRes.status).toBe(404);
+  });
 });
