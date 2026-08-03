@@ -120,16 +120,21 @@ export class ReviewsRepository {
 
   async findByCompanyId(
     companyId: string,
-    params: { page: number; limit: number },
+    params: { page: number; limit: number; sortBy?: string },
   ): Promise<{ data: ReviewRow[]; total: number }> {
     const offset = (params.page - 1) * params.limit;
+
+    const orderBy =
+      params.sortBy === 'engagement'
+        ? desc(sql`${reviews.helpfulCount} + ${reviews.unhelpfulCount}`)
+        : desc(reviews.createdAt);
 
     const data = await db
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
       .where(eq(reviews.companyId, companyId))
-      .orderBy(desc(reviews.createdAt))
+      .orderBy(orderBy)
       .limit(params.limit)
       .offset(offset);
 
@@ -214,31 +219,21 @@ export class ReviewsRepository {
   async getCompanyReviewStats(
     companyId: string,
   ): Promise<{ averageRating: string | null; reviewCount: number; recommendationRate: number }> {
-    const allReviews = await db
+    // Aggregate in SQL so we never pull every review row into memory.
+    const [result] = await db
       .select({
-        overallRating: reviews.overallRating,
-        isCurrentEmployee: reviews.isCurrentEmployee,
+        averageRating: sql<string>`round(avg(${reviews.overallRating}), 1)::text`,
+        reviewCount: count(),
+        recommendationRate: sql<number>`round((count(*) FILTER (WHERE ${reviews.isCurrentEmployee} = true)::numeric / nullif(count(*), 0)) * 100)::int`,
       })
       .from(reviews)
       .where(eq(reviews.companyId, companyId));
 
-    const reviewCount = allReviews.length;
-    const ratings = allReviews
-      .filter((r) => r.overallRating !== null)
-      .map((r) => r.overallRating!);
-    const averageRating =
-      ratings.length > 0
-        ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
-        : null;
-    const recommendationRate =
-      reviewCount > 0
-        ? Math.round(
-            (allReviews.filter((r) => r.isCurrentEmployee === true).length / reviewCount) *
-              100,
-          )
-        : 0;
-
-    return { averageRating, reviewCount, recommendationRate };
+    return {
+      averageRating: result?.averageRating ?? null,
+      reviewCount: result?.reviewCount ?? 0,
+      recommendationRate: result?.recommendationRate ?? 0,
+    };
   }
 }
 

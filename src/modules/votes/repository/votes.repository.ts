@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../../database/db.js';
 import { reviewVotes } from '../../../database/schema/reviewVote.js';
 
@@ -51,15 +51,19 @@ export class VotesRepository {
   }
 
   async getVoteCounts(reviewId: number): Promise<{ helpful: number; unhelpful: number }> {
-    const allVotes = await db
-      .select()
+    // Aggregate in SQL so we never pull every vote row into memory.
+    const [result] = await db
+      .select({
+        helpful: sql<number>`count(*) FILTER (WHERE ${reviewVotes.voteType} = 'helpful')`,
+        unhelpful: sql<number>`count(*) FILTER (WHERE ${reviewVotes.voteType} = 'unhelpful')`,
+      })
       .from(reviewVotes)
       .where(eq(reviewVotes.reviewId, reviewId));
 
-    const helpful = allVotes.filter((v) => v.voteType === 'helpful').length;
-    const unhelpful = allVotes.filter((v) => v.voteType === 'unhelpful').length;
-
-    return { helpful, unhelpful };
+    return {
+      helpful: result?.helpful ?? 0,
+      unhelpful: result?.unhelpful ?? 0,
+    };
   }
 }
 

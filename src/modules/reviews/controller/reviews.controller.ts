@@ -24,7 +24,7 @@ class ReviewsController {
     const limit = Number(req.query.limit) || 20;
 
     if (companySlug) {
-      const result = await reviewsService.listByCompanySlug(companySlug, page, limit);
+      const result = await reviewsService.listByCompanySlug(companySlug, page, limit, sortBy);
       sendSuccess(
         res,
         {

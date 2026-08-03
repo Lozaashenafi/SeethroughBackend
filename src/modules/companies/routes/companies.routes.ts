@@ -17,8 +17,11 @@ import {
 const companiesRoutes = Router();
 
 // Public routes
+// anonymousIdentity() runs before the rate limiter so limits are keyed per
+// identity (not per IP), consistent with the rest of the API.
 companiesRoutes.get(
   '/',
+  anonymousIdentity(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ query: listCompaniesQuerySchema }),
   asyncHandler(companiesController.list.bind(companiesController)),
@@ -27,6 +30,7 @@ companiesRoutes.get(
 // Scrape — must come BEFORE /:slug to prevent Express from matching 'scrape' as a slug
 companiesRoutes.post(
   '/scrape',
+  anonymousIdentity(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ body: scrapeCompanySchema }),
   asyncHandler(companiesController.scrape.bind(companiesController)),
@@ -34,6 +38,7 @@ companiesRoutes.post(
 
 companiesRoutes.get(
   '/:slug',
+  anonymousIdentity(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ params: companySlugParamsSchema }),
   asyncHandler(companiesController.getBySlug.bind(companiesController)),

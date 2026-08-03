@@ -61,12 +61,12 @@ class ReviewsService {
     return review;
   }
 
-  async listByCompanySlug(companySlug: string, page: number, limit: number) {
+  async listByCompanySlug(companySlug: string, page: number, limit: number, sortBy?: string) {
     const company = await companiesRepository.findBySlug(companySlug);
     if (!company) {
       throw new AppError('Company not found', 404);
     }
-    return reviewsRepository.findByCompanyId(company.id, { page, limit });
+    return reviewsRepository.findByCompanyId(company.id, { page, limit, sortBy });
   }
 
   async deleteByPublicId(publicId: string) {
