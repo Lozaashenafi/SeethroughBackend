@@ -1,7 +1,16 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
+import net from 'node:net';
 import pg from 'pg';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
+
+// Node 20+ happy-eyeballs gives each resolved address only 250ms to accept a
+// TCP connection. Neon (and some other managed Postgres) endpoints can be
+// slower than that, causing spurious ETIMEDOUT errors. Disable it so the full
+// connection timeout is used instead.
+if (typeof net.setDefaultAutoSelectFamily === 'function') {
+  net.setDefaultAutoSelectFamily(false);
+}
 
 export const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
