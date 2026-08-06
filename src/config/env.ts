@@ -10,9 +10,12 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(4000),
   DATABASE_URL: z.string(),
+  // Comma-separated browser origins allowed to call the API. MUST include your
+  // deployed frontend origin (e.g. https://yourfrontend.vercel.app) or
+  // cross-origin login/admin calls will be rejected.
   CORS_ORIGIN: z
     .string()
-    .default('http://localhost:5173,https://seethroght.vercel.app'),
+    .default('http://localhost:5173,https://seethroughfront.vercel.app'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   JWT_SECRET: z.string().optional(),
   ADMIN_EMAIL: z.string().email().default(DEFAULT_ADMIN_EMAIL),

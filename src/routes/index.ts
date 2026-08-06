@@ -9,18 +9,19 @@ import { reportsRoutes } from '../modules/reports/routes/reports.routes.js';
 import { industriesRoutes } from '../modules/industries/routes/industries.routes.js';
 import { tagsRoutes } from '../modules/tags/routes/tags.routes.js';
 import { authRoutes } from '../modules/auth/routes/auth.routes.js';
+import { API_PREFIX } from '../shared/constants/index.js';
 
 const router = Router();
 
-router.use('/api/v1/health', healthRoutes);
-router.use('/api/v1/anonymous', anonymousRoutes);
-router.use('/api/v1/companies', companiesRoutes);
-router.use('/api/v1/reviews', reviewsRoutes);
-router.use('/api/v1/comments', commentsRoutes);
-router.use('/api/v1/votes', votesRoutes);
-router.use('/api/v1/reports', reportsRoutes);
-router.use('/api/v1/industries', industriesRoutes);
-router.use('/api/v1/tags', tagsRoutes);
-router.use('/api/v1/auth', authRoutes);
+router.use(`${API_PREFIX}/health`, healthRoutes);
+router.use(`${API_PREFIX}/anonymous`, anonymousRoutes);
+router.use(`${API_PREFIX}/companies`, companiesRoutes);
+router.use(`${API_PREFIX}/reviews`, reviewsRoutes);
+router.use(`${API_PREFIX}/comments`, commentsRoutes);
+router.use(`${API_PREFIX}/votes`, votesRoutes);
+router.use(`${API_PREFIX}/reports`, reportsRoutes);
+router.use(`${API_PREFIX}/industries`, industriesRoutes);
+router.use(`${API_PREFIX}/tags`, tagsRoutes);
+router.use(`${API_PREFIX}/auth`, authRoutes);
 
 export { router };

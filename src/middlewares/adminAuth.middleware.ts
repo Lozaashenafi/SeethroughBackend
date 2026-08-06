@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from '../modules/auth/service/auth.service.js';
 import { sendError } from '../shared/responses/index.js';
 import type { AdminJwtPayload } from '../modules/auth/types/auth.types.js';
+import { ADMIN_TOKEN_COOKIE } from '../shared/constants/index.js';
 
 declare global {
   namespace Express {
@@ -14,7 +15,7 @@ declare global {
 export function adminAuth() {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
-      const cookieToken = req.cookies?.admin_token as string | undefined;
+      const cookieToken = req.cookies?.[ADMIN_TOKEN_COOKIE] as string | undefined;
       const authHeader = req.headers.authorization;
       const headerToken =
         authHeader && authHeader.startsWith('Bearer ')

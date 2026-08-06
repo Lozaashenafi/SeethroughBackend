@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { authRepository } from '../repository/auth.repository.js';
 import { AppError } from '../../../shared/errors/AppError.js';
 import { env } from '../../../config/env.js';
+import { ADMIN_SESSION_TTL_MS } from '../../../shared/constants/index.js';
 import type { AdminJwtPayload } from '../types/auth.types.js';
 
 class AuthService {
@@ -23,7 +24,9 @@ class AuthService {
       name: admin.name,
     };
 
-    const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign(payload, env.JWT_SECRET, {
+      expiresIn: Math.floor(ADMIN_SESSION_TTL_MS / 1000), // seconds = ADMIN_SESSION_TTL_MS
+    });
 
     return {
       token,

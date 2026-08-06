@@ -3,16 +3,19 @@ import { sendSuccess } from '../../../shared/responses/index.js';
 import { authService } from '../service/auth.service.js';
 import { toLoginResponse } from '../types/auth.types.js';
 import { env } from '../../../config/env.js';
-
-const ADMIN_TOKEN_COOKIE = 'admin_token';
-const ADMIN_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+import { ADMIN_SESSION_TTL_MS, ADMIN_TOKEN_COOKIE } from '../../../shared/constants/index.js';
 
 function adminCookieOptions(): CookieOptions {
+  // In production the frontend and API are on different origins, so the cookie
+  // must be sent cross-site. SameSite=None (which requires Secure) is allowed
+  // for both same-site and cross-site requests. In development we keep Lax so
+  // cookies work over plain http://localhost.
+  const crossSite = env.NODE_ENV === 'production';
   return {
     httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: ADMIN_SESSION_MAX_AGE_MS,
+    secure: crossSite,
+    sameSite: crossSite ? 'none' : 'lax',
+    maxAge: ADMIN_SESSION_TTL_MS,
     path: '/',
   };
 }
@@ -28,12 +31,9 @@ class AuthController {
   }
 
   async logout(_req: Request, res: Response, _next: NextFunction): Promise<void> {
-    res.clearCookie(ADMIN_TOKEN_COOKIE, {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-    });
+    // Must use identical attributes to the set cookie (esp. SameSite), or
+    // the clearing response won't match and the cookie won't be removed.
+    res.clearCookie(ADMIN_TOKEN_COOKIE, adminCookieOptions());
 
     sendSuccess(res, null, 'Logged out');
   }
