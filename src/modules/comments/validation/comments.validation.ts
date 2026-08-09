@@ -6,3 +6,8 @@ export const createCommentSchema = z.object({
   content: sanitizedString(1, 2000),
   parentId: z.number().int().positive('Invalid parent comment ID').optional(),
 });
+
+export const listCommentsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(50).default(20),
+});

@@ -20,6 +20,19 @@ function adminCookieOptions(): CookieOptions {
   };
 }
 
+// Must match adminCookieOptions() so the browser treats it as the same cookie,
+// but WITHOUT maxAge — clearCookie only expires the cookie when no future
+// max-age/expires is sent, otherwise logout would leave a live session behind.
+function clearAdminCookieOptions(): CookieOptions {
+  const crossSite = env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: crossSite,
+    sameSite: crossSite ? 'none' : 'lax',
+    path: '/',
+  };
+}
+
 class AuthController {
   async login(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { email, password } = req.body;
@@ -33,7 +46,7 @@ class AuthController {
   async logout(_req: Request, res: Response, _next: NextFunction): Promise<void> {
     // Must use identical attributes to the set cookie (esp. SameSite), or
     // the clearing response won't match and the cookie won't be removed.
-    res.clearCookie(ADMIN_TOKEN_COOKIE, adminCookieOptions());
+    res.clearCookie(ADMIN_TOKEN_COOKIE, clearAdminCookieOptions());
 
     sendSuccess(res, null, 'Logged out');
   }

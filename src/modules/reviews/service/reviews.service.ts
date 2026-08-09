@@ -1,5 +1,6 @@
 import { reviewsRepository } from '../repository/reviews.repository.js';
 import { companiesRepository } from '../../companies/repository/companies.repository.js';
+import { db } from '../../../database/db.js';
 import { AppError } from '../../../shared/errors/AppError.js';
 import type { CreateReviewInput } from '../types/reviews.types.js';
 
@@ -9,6 +10,16 @@ class ReviewsService {
     const company = await companiesRepository.findBySlug(input.companySlug);
     if (!company) {
       throw new AppError('Company not found', 404);
+    }
+
+    // A reviewer should not review the same company more than once. The rate
+    // limit alone is not a reliable guard, so enforce it here too.
+    const existing = await reviewsRepository.findByAnonymousAndCompany(
+      input.anonymousId,
+      company.id,
+    );
+    if (existing) {
+      throw new AppError('You have already reviewed this company.', 409);
     }
 
     // Validate ratings are within range
@@ -27,28 +38,33 @@ class ReviewsService {
       }
     }
 
-    const review = await reviewsRepository.create({
-      anonymousId: input.anonymousId,
-      companyId: company.id,
-      companySlug: input.companySlug,
-      title: input.title,
-      pros: input.pros,
-      cons: input.cons,
-      overallRating: input.overallRating,
-      workLifeBalance: input.workLifeBalance,
-      culture: input.culture,
-      management: input.management,
-      compensation: input.compensation,
-      opportunities: input.opportunities,
-      isCurrentEmployee: input.isCurrentEmployee,
-      employmentStatus: input.employmentStatus,
-      jobTitle: input.jobTitle,
-      tagIds: input.tagIds,
-    });
+    // Review insert, tag links and company stats update are committed
+    // atomically so a failure never leaves a half-created review or stale stats.
+    const review = await db.transaction(async (tx) => {
+      const created = await reviewsRepository.createWithClient(tx, {
+        anonymousId: input.anonymousId,
+        companyId: company.id,
+        companySlug: input.companySlug,
+        title: input.title,
+        pros: input.pros,
+        cons: input.cons,
+        overallRating: input.overallRating,
+        workLifeBalance: input.workLifeBalance,
+        culture: input.culture,
+        management: input.management,
+        compensation: input.compensation,
+        opportunities: input.opportunities,
+        isCurrentEmployee: input.isCurrentEmployee,
+        employmentStatus: input.employmentStatus,
+        jobTitle: input.jobTitle,
+        tagIds: input.tagIds,
+      });
 
-    // Update company stats
-    const stats = await reviewsRepository.getCompanyReviewStats(company.id);
-    await companiesRepository.updateStats(company.id, stats);
+      const stats = await reviewsRepository.getCompanyReviewStatsWithClient(tx, company.id);
+      await companiesRepository.updateStatsWithClient(tx, company.id, stats);
+
+      return created;
+    });
 
     return review;
   }
@@ -75,14 +91,20 @@ class ReviewsService {
       throw new AppError('Review not found', 404);
     }
 
-    const deleted = await reviewsRepository.deleteByPublicId(publicId);
+    // Cascade delete and company stats recompute happen in one transaction so
+    // the denormalized counters can never drift from the actual review set.
+    const deleted = await db.transaction(async (tx) => {
+      const ok = await reviewsRepository.deleteByPublicIdWithClient(tx, publicId);
+      if (!ok) return false;
+
+      const stats = await reviewsRepository.getCompanyReviewStatsWithClient(tx, review.companyId);
+      await companiesRepository.updateStatsWithClient(tx, review.companyId, stats);
+      return true;
+    });
+
     if (!deleted) {
       throw new AppError('Failed to delete review', 500);
     }
-
-    // Update company stats (recalculate without this review)
-    const stats = await reviewsRepository.getCompanyReviewStats(review.companyId);
-    await companiesRepository.updateStats(review.companyId, stats);
   }
 
   async listAll(page: number, limit: number, sortBy?: string) {

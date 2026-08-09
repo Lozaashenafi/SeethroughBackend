@@ -5,7 +5,7 @@ import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.j
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
 import { RATE_LIMITS } from '../../../shared/constants/index.js';
-import { createCommentSchema } from '../validation/comments.validation.js';
+import { createCommentSchema, listCommentsQuerySchema } from '../validation/comments.validation.js';
 
 const commentsRoutes = Router();
 
@@ -14,6 +14,7 @@ commentsRoutes.use(anonymousIdentity());
 commentsRoutes.get(
   '/review/:reviewPublicId',
   createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ query: listCommentsQuerySchema }),
   asyncHandler(commentsController.listByReview.bind(commentsController)),
 );
 

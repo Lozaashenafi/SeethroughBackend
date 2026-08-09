@@ -20,6 +20,11 @@ declare global {
 
 const app = express();
 
+// Trust the immediate reverse proxy so req.ip reflects the real client IP.
+// Without this, IP-keyed rate limits (e.g. admin login) would all share the
+// proxy's address when deployed behind a proxy (e.g. Vercel/NGINX).
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(compression());
 app.use(cors(corsConfig));

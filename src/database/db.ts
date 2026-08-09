@@ -25,6 +25,9 @@ pool.on('error', (err) => {
 
 export const db = drizzle(pool);
 
+// Type of the transaction client handed to db.transaction(...) callbacks.
+export type DatabaseTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export async function testConnection(): Promise<boolean> {
   try {
     const client = await pool.connect();

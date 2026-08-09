@@ -12,6 +12,15 @@ import { AppError } from '../../../shared/errors/AppError.js';
 const MAX_REDIRECTS = 5;
 const REQUEST_TIMEOUT_MS = 12000;
 
+// Cap the response body size so a malicious site cannot stream an unbounded
+// amount of HTML into memory (DoS).
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024; // 2 MiB
+
+// Only standard web ports are allowed. Without this, the scraper could be used
+// to probe arbitrary TCP ports on public hosts (e.g. :6379 Redis, :25 SMTP,
+// :9200 Elasticsearch), turning it into a general connection oracle.
+const ALLOWED_PORTS = new Set([80, 443, 8080, 8443]);
+
 // Reserved / private IP ranges that must never be fetched (SSRF protection).
 const PRIVATE_RANGES = (() => {
   const blockList = new BlockList();
@@ -325,6 +334,14 @@ class CompanyScraperService {
     const hostname = this.stripIpv6Brackets(parsed.hostname);
     const isHttps = parsed.protocol === 'https:';
     const port = parsed.port ? Number(parsed.port) : isHttps ? 443 : 80;
+
+    if (!ALLOWED_PORTS.has(port)) {
+      throw new AppError(
+        'Only standard web ports (80, 443, 8080, 8443) are supported.',
+        400,
+      );
+    }
+
     const path = `${parsed.pathname}${parsed.search}`;
     const addresses = await this.resolvePublicAddresses(hostname);
 
@@ -432,7 +449,19 @@ class CompanyScraperService {
         }
 
         const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        let receivedBytes = 0;
+        res.on('data', (chunk: Buffer) => {
+          receivedBytes += chunk.length;
+          if (receivedBytes > MAX_RESPONSE_BYTES) {
+            clearTimeout(timeout);
+            res.destroy();
+            reject(
+              new AppError('Website response was too large to process.', 400),
+            );
+            return;
+          }
+          chunks.push(chunk);
+        });
         res.on('end', () => {
           clearTimeout(timeout);
           resolve(Buffer.concat(chunks).toString('utf8'));

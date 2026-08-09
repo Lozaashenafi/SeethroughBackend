@@ -9,8 +9,8 @@ class AnonymousController {
   }
 
   async list(req: Request, res: Response, _next: NextFunction): Promise<void> {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 20;
+    const page = Number(req.query.page);
+    const limit = Number(req.query.limit);
     const status = req.query.status as string | undefined;
 
     const result = await anonymousService.list({ page, limit, status });

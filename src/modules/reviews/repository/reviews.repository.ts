@@ -1,6 +1,6 @@
-import { eq, desc, count, sql, inArray, or, type SQL } from 'drizzle-orm';
+import { eq, and, desc, count, sql, inArray, or, type SQL } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
-import { db } from '../../../database/db.js';
+import { db, type DatabaseTx } from '../../../database/db.js';
 import { reviews } from '../../../database/schema/review.js';
 import { companies } from '../../../database/schema/company.js';
 import { reviewTags } from '../../../database/schema/reviewTag.js';
@@ -8,6 +8,8 @@ import { comments } from '../../../database/schema/comment.js';
 import { reviewVotes } from '../../../database/schema/reviewVote.js';
 import { reports } from '../../../database/schema/report.js';
 import type { CreateReviewInput } from '../types/reviews.types.js';
+
+type DbClient = typeof db | DatabaseTx;
 
 const reviewColumns = {
   id: reviews.id,
@@ -63,9 +65,16 @@ interface ReviewRow {
 
 export class ReviewsRepository {
   async create(input: CreateReviewInput & { anonymousId: string; companyId: string }): Promise<ReviewRow> {
+    return this.createWithClient(db, input);
+  }
+
+  async createWithClient(
+    client: DbClient,
+    input: CreateReviewInput & { anonymousId: string; companyId: string },
+  ): Promise<ReviewRow> {
     const publicId = nanoid(16);
 
-    const [review] = await db
+    const [review] = await client
       .insert(reviews)
       .values({
         publicId,
@@ -88,7 +97,7 @@ export class ReviewsRepository {
 
     // Insert tags if provided
     if (input.tagIds && input.tagIds.length > 0) {
-      await db.insert(reviewTags).values(
+      await client.insert(reviewTags).values(
         input.tagIds.map((tagId) => ({
           reviewId: review.id,
           tagId,
@@ -97,11 +106,15 @@ export class ReviewsRepository {
     }
 
     // Fetch the complete review with company data
-    return (await this.findById(review.id))!;
+    return (await this.findByIdWithClient(client, review.id))!;
   }
 
   async findByPublicId(publicId: string): Promise<ReviewRow | null> {
-    const [review] = await db
+    return this.findByPublicIdWithClient(db, publicId);
+  }
+
+  async findByPublicIdWithClient(client: DbClient, publicId: string): Promise<ReviewRow | null> {
+    const [review] = await client
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
@@ -110,7 +123,23 @@ export class ReviewsRepository {
   }
 
   async findById(id: number): Promise<ReviewRow | null> {
+    return this.findByIdWithClient(db, id);
+  }
+
+  async findByAnonymousAndCompany(
+    anonymousId: string,
+    companyId: string,
+  ): Promise<ReviewRow | null> {
     const [review] = await db
+      .select(reviewColumns)
+      .from(reviews)
+      .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .where(and(eq(reviews.anonymousId, anonymousId), eq(reviews.companyId, companyId)));
+    return review ?? null;
+  }
+
+  async findByIdWithClient(client: DbClient, id: number): Promise<ReviewRow | null> {
+    const [review] = await client
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
@@ -147,12 +176,16 @@ export class ReviewsRepository {
   }
 
   async deleteByPublicId(publicId: string): Promise<boolean> {
+    return this.deleteByPublicIdWithClient(db, publicId);
+  }
+
+  async deleteByPublicIdWithClient(client: DbClient, publicId: string): Promise<boolean> {
     // First find the review to get its internal ID for child records
-    const review = await this.findByPublicId(publicId);
+    const review = await this.findByPublicIdWithClient(client, publicId);
     if (!review) return false;
 
     // Cascade delete in a single transaction for atomicity
-    return db.transaction(async (tx) => {
+    return client.transaction(async (tx) => {
       // Collect comment IDs so reports referencing them can be removed too
       const reviewComments = await tx
         .select({ id: comments.id })
@@ -219,8 +252,15 @@ export class ReviewsRepository {
   async getCompanyReviewStats(
     companyId: string,
   ): Promise<{ averageRating: string | null; reviewCount: number; recommendationRate: number }> {
+    return this.getCompanyReviewStatsWithClient(db, companyId);
+  }
+
+  async getCompanyReviewStatsWithClient(
+    client: DbClient,
+    companyId: string,
+  ): Promise<{ averageRating: string | null; reviewCount: number; recommendationRate: number }> {
     // Aggregate in SQL so we never pull every review row into memory.
-    const [result] = await db
+    const [result] = await client
       .select({
         averageRating: sql<string>`round(avg(${reviews.overallRating}), 1)::text`,
         reviewCount: count(),

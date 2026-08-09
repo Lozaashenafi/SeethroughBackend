@@ -11,6 +11,11 @@ declare global {
   namespace Express {
     interface Request {
       anonymous?: AnonymousIdentity;
+      // True when no valid identity cookie pair was presented and a fresh
+      // identity was minted for this request. Rate limiting must not key on a
+      // freshly-minted publicId, or an attacker could rotate fake
+      // `anonymous_id` cookies to reset its per-identity budget on every call.
+      isNewAnonymousIdentity?: boolean;
     }
   }
 }
@@ -44,6 +49,7 @@ export function anonymousIdentity() {
 
       const { identity, rawSessionToken } = await anonymousService.create();
       req.anonymous = identity;
+      req.isNewAnonymousIdentity = true;
       res.cookie(ANONYMOUS_COOKIE_NAME, identity.publicId, cookieConfig);
       res.cookie(ANONYMOUS_SESSION_COOKIE_NAME, rawSessionToken, {
         ...cookieConfig,

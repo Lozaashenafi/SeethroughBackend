@@ -1,5 +1,5 @@
 import { eq, and, ilike, or, desc, count, inArray, type SQL } from 'drizzle-orm';
-import { db } from '../../../database/db.js';
+import { db, type DatabaseTx } from '../../../database/db.js';
 import { companies } from '../../../database/schema/company.js';
 import { reviews } from '../../../database/schema/review.js';
 import { comments } from '../../../database/schema/comment.js';
@@ -183,7 +183,15 @@ export class CompaniesRepository {
   }
 
   async updateStats(id: string, stats: { reviewCount: number; averageRating: string | null; recommendationRate: number }): Promise<void> {
-    await db
+    return this.updateStatsWithClient(db, id, stats);
+  }
+
+  async updateStatsWithClient(
+    client: typeof db | DatabaseTx,
+    id: string,
+    stats: { reviewCount: number; averageRating: string | null; recommendationRate: number },
+  ): Promise<void> {
+    await client
       .update(companies)
       .set({
         reviewCount: stats.reviewCount,

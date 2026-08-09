@@ -6,15 +6,22 @@ import { env } from '../../../config/env.js';
 import { ADMIN_SESSION_TTL_MS } from '../../../shared/constants/index.js';
 import type { AdminJwtPayload } from '../types/auth.types.js';
 
+// A valid bcrypt hash of a random value. When the email is unknown we compare
+// against this so both unknown-email and wrong-password cases take the same
+// amount of time, preventing user-enumeration via response timing.
+const DUMMY_PASSWORD_HASH =
+  '$2b$10$QNTaq1ejo3M.YILwyMnAt.1V/DahPFee4NgPIOSZTOaUuW7vZLyyK';
+
 class AuthService {
   async login(email: string, password: string): Promise<{ token: string; admin: { id: number; email: string; name: string } }> {
     const admin = await authRepository.findByEmail(email);
-    if (!admin) {
-      throw new AppError('Invalid email or password', 401);
-    }
 
-    const isPasswordValid = await bcrypt.compare(password, admin.passwordHash);
-    if (!isPasswordValid) {
+    // Always run the comparison, against the real hash when the admin exists or
+    // a dummy hash otherwise, so timing does not reveal whether the email is valid.
+    const passwordHash = admin?.passwordHash ?? DUMMY_PASSWORD_HASH;
+    const isPasswordValid = await bcrypt.compare(password, passwordHash);
+
+    if (!admin || !isPasswordValid) {
       throw new AppError('Invalid email or password', 401);
     }
 

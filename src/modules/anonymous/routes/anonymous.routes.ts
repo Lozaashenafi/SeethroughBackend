@@ -3,8 +3,10 @@ import { anonymousController } from '../controller/anonymous.controller.js';
 import { anonymousIdentity } from '../../../middlewares/anonymousIdentity.middleware.js';
 import { adminAuth } from '../../../middlewares/adminAuth.middleware.js';
 import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.js';
+import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
 import { RATE_LIMITS } from '../../../shared/constants/index.js';
+import { listIdentitiesQuerySchema } from '../validation/anonymous.validation.js';
 
 const anonymousRoutes = Router();
 
@@ -22,6 +24,7 @@ anonymousRoutes.get(
   '/admin/list',
   adminAuth(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ query: listIdentitiesQuerySchema }),
   asyncHandler(anonymousController.list.bind(anonymousController)),
 );
 

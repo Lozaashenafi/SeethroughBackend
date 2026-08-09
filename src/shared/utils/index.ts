@@ -8,10 +8,14 @@ export function stripHtml(input: string): string {
 }
 
 export function sanitizedString(minLength?: number, maxLength?: number) {
-  let schema: z.ZodString = z.string();
-  if (minLength !== undefined) schema = schema.min(minLength);
-  if (maxLength !== undefined) schema = schema.max(maxLength);
-  return schema.transform((val) => stripHtml(val.trim()));
+  // Strip HTML and trim BEFORE validating length. Validating the raw input
+  // first allowed tag/whitespace-padded strings (e.g. "<b></b>") to pass the
+  // min-length check and then collapse to an empty value.
+  const sanitized = z.string().transform((val) => stripHtml(val.trim()));
+  let lengthValidated: z.ZodString = z.string();
+  if (minLength !== undefined) lengthValidated = lengthValidated.min(minLength);
+  if (maxLength !== undefined) lengthValidated = lengthValidated.max(maxLength);
+  return sanitized.pipe(lengthValidated);
 }
 
 export function asyncHandler(
