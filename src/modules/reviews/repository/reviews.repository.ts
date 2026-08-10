@@ -186,6 +186,43 @@ export class ReviewsRepository {
       .limit(limit);
   }
 
+  /** All reviews (any moderation status) authored by an identity, newest first. */
+  async findByAnonymousId(
+    anonymousId: string,
+    params: { page: number; limit: number },
+  ): Promise<{ data: ReviewRow[]; total: number }> {
+    const offset = (params.page - 1) * params.limit;
+
+    const data = await db
+      .select(reviewColumns)
+      .from(reviews)
+      .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
+      .where(eq(reviews.anonymousId, anonymousId))
+      .orderBy(desc(reviews.createdAt))
+      .limit(params.limit)
+      .offset(offset);
+
+    const [totalResult] = await db
+      .select({ total: count() })
+      .from(reviews)
+      .where(eq(reviews.anonymousId, anonymousId));
+
+    return { data, total: totalResult?.total ?? 0 };
+  }
+
+  /** Every review (any moderation status) authored by an identity, newest first. */
+  async findAllByAnonymousId(anonymousId: string, limit = 1000): Promise<ReviewRow[]> {
+    return db
+      .select(reviewColumns)
+      .from(reviews)
+      .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
+      .where(eq(reviews.anonymousId, anonymousId))
+      .orderBy(desc(reviews.createdAt))
+      .limit(limit);
+  }
+
   /** Find a review whose content fingerprint matches (exact duplicate check). */
   async findByFingerprint(fingerprint: string): Promise<ReviewRow | null> {
     const [review] = await db

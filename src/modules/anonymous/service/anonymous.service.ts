@@ -1,10 +1,25 @@
 import { nanoid } from 'nanoid';
 import { anonymousRepository } from '../repository/anonymous.repository.js';
+import { reviewsRepository } from '../../reviews/repository/reviews.repository.js';
+import { commentsRepository } from '../../comments/repository/comments.repository.js';
+import { votesRepository } from '../../votes/repository/votes.repository.js';
+import { reportsRepository } from '../../reports/repository/reports.repository.js';
+import { toReviewResponse, type ReviewResponse } from '../../reviews/types/reviews.types.js';
 import { ANONYMOUS_ID_LENGTH } from '../../../shared/constants/index.js';
 import { generateNickname } from '../../../shared/utils/index.js';
 import { AppError } from '../../../shared/errors/AppError.js';
 import type { AnonymousIdentity } from '../../../shared/types/index.js';
-import type { CreateAnonymousResult } from '../types/anonymous.types.js';
+import type {
+  AnonymousActivityResponse,
+  ActivityPagination,
+  CreateAnonymousResult,
+} from '../types/anonymous.types.js';
+import {
+  toAnonymousResponse,
+  toCommentActivityItem,
+  toVoteActivityItem,
+  toReportActivityItem,
+} from '../types/anonymous.types.js';
 
 const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000;
 const LAST_SEEN_CACHE_MAX_ENTRIES = 10_000;
@@ -59,7 +74,7 @@ class AnonymousService {
     return identity;
   }
 
-  async list(params: { page: number; limit: number; status?: string }) {
+  async list(params: { page: number; limit: number; status?: string; search?: string }) {
     return anonymousRepository.findAll(params);
   }
 
@@ -128,6 +143,62 @@ class AnonymousService {
       throw new AppError('Identity not found', 404);
     }
     return anonymousRepository.clearTempBlock(identity.id);
+  }
+
+  /** Every review authored by an identity across all time (admin-only). */
+  async getAllReviews(publicId: string): Promise<ReviewResponse[]> {
+    const identity = await anonymousRepository.findByPublicId(publicId);
+    if (!identity) {
+      throw new AppError('Identity not found', 404);
+    }
+    const reviews = await reviewsRepository.findAllByAnonymousId(identity.id);
+    return reviews.map(toReviewResponse);
+  }
+
+  /** Aggregate of an identity's reviews, comments, votes, and reports (admin-only). */
+  async getActivity(
+    publicId: string,
+    params: { page: number; limit: number },
+  ): Promise<AnonymousActivityResponse> {
+    const identity = await anonymousRepository.findByPublicId(publicId);
+    if (!identity) {
+      throw new AppError('Identity not found', 404);
+    }
+
+    const { page, limit } = params;
+    const toPagination = (total: number): ActivityPagination => ({
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
+
+    const [reviews, comments, votes, reports] = await Promise.all([
+      reviewsRepository.findByAnonymousId(identity.id, { page, limit }),
+      commentsRepository.findByAnonymousId(identity.id, { page, limit }),
+      votesRepository.findByAnonymousId(identity.id, { page, limit }),
+      reportsRepository.findByAnonymousId(identity.id, { page, limit }),
+    ]);
+
+    return {
+      identity: toAnonymousResponse(identity),
+      reviews: {
+        data: reviews.data.map(toReviewResponse),
+        pagination: toPagination(reviews.total),
+      },
+      comments: {
+        data: comments.data.map(toCommentActivityItem),
+        pagination: toPagination(comments.total),
+      },
+      votes: {
+        data: votes.data.map(toVoteActivityItem),
+        pagination: toPagination(votes.total),
+      },
+      reports: {
+        data: reports.data.map(toReportActivityItem),
+        pagination: toPagination(reports.total),
+      },
+    };
   }
 }
 

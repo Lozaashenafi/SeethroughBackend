@@ -1,4 +1,4 @@
-import { eq, and, count, desc, type SQL } from 'drizzle-orm';
+import { eq, and, count, desc, or, ilike, type SQL } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import { db } from '../../../database/db.js';
 import { anonymousIdentities } from '../../../database/schema/anonymousIdentity.js';
@@ -50,11 +50,20 @@ export class AnonymousRepository {
       .where(eq(anonymousIdentities.id, id));
   }
 
-  async findAll(params: { page: number; limit: number; status?: string }): Promise<{ data: AnonymousRow[]; total: number }> {
+  async findAll(params: { page: number; limit: number; status?: string; search?: string }): Promise<{ data: AnonymousRow[]; total: number }> {
     const conditions: SQL[] = [];
 
     if (params.status && params.status !== 'all') {
       conditions.push(eq(anonymousIdentities.status, params.status as 'active' | 'disabled' | 'flagged'));
+    }
+
+    if (params.search) {
+      const search = `%${params.search.trim()}%`;
+      const searchCondition = or(
+        ilike(anonymousIdentities.nickname, search),
+        ilike(anonymousIdentities.publicId, search),
+      );
+      if (searchCondition) conditions.push(searchCondition);
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

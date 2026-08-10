@@ -2,6 +2,18 @@ import { eq, desc, count } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { db } from '../../../database/db.js';
 import { comments } from '../../../database/schema/comment.js';
+import { reviews } from '../../../database/schema/review.js';
+import { companies } from '../../../database/schema/company.js';
+
+interface CommentActivityRow {
+  publicId: string;
+  reviewPublicId: string | null;
+  reviewTitle: string | null;
+  companyName: string | null;
+  content: string;
+  helpfulCount: number;
+  createdAt: Date;
+}
 
 interface CommentRow {
   id: number;
@@ -56,6 +68,39 @@ export class CommentsRepository {
       .select({ total: count() })
       .from(comments)
       .where(eq(comments.reviewId, reviewId));
+
+    return { data, total: totalResult?.total ?? 0 };
+  }
+
+  /** All comments authored by an identity, newest first, with target review info. */
+  async findByAnonymousId(
+    anonymousId: string,
+    params: { page: number; limit: number },
+  ): Promise<{ data: CommentActivityRow[]; total: number }> {
+    const offset = (params.page - 1) * params.limit;
+
+    const data = await db
+      .select({
+        publicId: comments.publicId,
+        reviewPublicId: reviews.publicId,
+        reviewTitle: reviews.title,
+        companyName: companies.name,
+        content: comments.content,
+        helpfulCount: comments.helpfulCount,
+        createdAt: comments.createdAt,
+      })
+      .from(comments)
+      .leftJoin(reviews, eq(comments.reviewId, reviews.id))
+      .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .where(eq(comments.anonymousId, anonymousId))
+      .orderBy(desc(comments.createdAt))
+      .limit(params.limit)
+      .offset(offset);
+
+    const [totalResult] = await db
+      .select({ total: count() })
+      .from(comments)
+      .where(eq(comments.anonymousId, anonymousId));
 
     return { data, total: totalResult?.total ?? 0 };
   }

@@ -1,11 +1,21 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, desc, count, sql } from 'drizzle-orm';
 import { db } from '../../../database/db.js';
 import { reviewVotes } from '../../../database/schema/reviewVote.js';
+import { reviews } from '../../../database/schema/review.js';
+import { companies } from '../../../database/schema/company.js';
 
 interface VoteRow {
   id: number;
   reviewId: number;
   anonymousId: string;
+  voteType: string;
+  createdAt: Date;
+}
+
+interface VoteActivityRow {
+  reviewPublicId: string | null;
+  reviewTitle: string | null;
+  companyName: string | null;
   voteType: string;
   createdAt: Date;
 }
@@ -48,6 +58,37 @@ export class VotesRepository {
         ),
       );
     return vote ?? null;
+  }
+
+  /** All votes cast by an identity, newest first, with target review info. */
+  async findByAnonymousId(
+    anonymousId: string,
+    params: { page: number; limit: number },
+  ): Promise<{ data: VoteActivityRow[]; total: number }> {
+    const offset = (params.page - 1) * params.limit;
+
+    const data = await db
+      .select({
+        reviewPublicId: reviews.publicId,
+        reviewTitle: reviews.title,
+        companyName: companies.name,
+        voteType: reviewVotes.voteType,
+        createdAt: reviewVotes.createdAt,
+      })
+      .from(reviewVotes)
+      .leftJoin(reviews, eq(reviewVotes.reviewId, reviews.id))
+      .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .where(eq(reviewVotes.anonymousId, anonymousId))
+      .orderBy(desc(reviewVotes.createdAt))
+      .limit(params.limit)
+      .offset(offset);
+
+    const [totalResult] = await db
+      .select({ total: count() })
+      .from(reviewVotes)
+      .where(eq(reviewVotes.anonymousId, anonymousId));
+
+    return { data, total: totalResult?.total ?? 0 };
   }
 
   async getVoteCounts(reviewId: number): Promise<{ helpful: number; unhelpful: number }> {

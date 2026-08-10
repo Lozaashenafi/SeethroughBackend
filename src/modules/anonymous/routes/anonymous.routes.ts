@@ -6,7 +6,11 @@ import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.j
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
 import { RATE_LIMITS } from '../../../shared/constants/index.js';
-import { listIdentitiesQuerySchema, tempBlockSchema } from '../validation/anonymous.validation.js';
+import {
+  listIdentitiesQuerySchema,
+  activityQuerySchema,
+  tempBlockSchema,
+} from '../validation/anonymous.validation.js';
 
 const anonymousRoutes = Router();
 
@@ -61,6 +65,21 @@ anonymousRoutes.patch(
   adminAuth(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   asyncHandler(anonymousController.clearTempBlock.bind(anonymousController)),
+);
+
+anonymousRoutes.get(
+  '/admin/:publicId/activity',
+  adminAuth(),
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ query: activityQuerySchema }),
+  asyncHandler(anonymousController.getActivity.bind(anonymousController)),
+);
+
+anonymousRoutes.get(
+  '/admin/:publicId/reviews',
+  adminAuth(),
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  asyncHandler(anonymousController.getReviews.bind(anonymousController)),
 );
 
 export { anonymousRoutes };

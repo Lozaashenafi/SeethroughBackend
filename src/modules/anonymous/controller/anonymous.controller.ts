@@ -17,8 +17,9 @@ class AnonymousController {
     const page = Number(req.query.page);
     const limit = Number(req.query.limit);
     const status = req.query.status as string | undefined;
+    const search = req.query.search as string | undefined;
 
-    const result = await anonymousService.list({ page, limit, status });
+    const result = await anonymousService.list({ page, limit, status, search });
     sendSuccess(
       res,
       {
@@ -57,6 +58,21 @@ class AnonymousController {
     const { publicId } = req.params;
     const identity = await anonymousService.clearTempBlock(publicId);
     sendSuccess(res, toAnonymousResponse(identity), 'Temporary block lifted');
+  }
+
+  async getActivity(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const page = Number(req.query.page);
+    const limit = Number(req.query.limit);
+
+    const activity = await anonymousService.getActivity(publicId, { page, limit });
+    sendSuccess(res, activity, 'Identity activity retrieved');
+  }
+
+  async getReviews(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const reviews = await anonymousService.getAllReviews(publicId);
+    sendSuccess(res, { reviews }, 'Identity reviews retrieved');
   }
 }
 
