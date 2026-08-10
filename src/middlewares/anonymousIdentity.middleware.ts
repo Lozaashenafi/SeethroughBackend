@@ -38,8 +38,12 @@ export function anonymousIdentity() {
               next(new AppError('Your account has been blocked. If you believe this is a mistake, please contact support.', 403));
               return;
             }
-            req.anonymous = identity;
-            await anonymousService.updateLastSeen(identity.id);
+
+            // Backfill a nickname for identities created before nicknames were
+            // introduced, and always carry it on the request identity.
+            const enriched = await anonymousService.ensureNickname(identity);
+            req.anonymous = enriched;
+            await anonymousService.updateLastSeen(enriched.id);
             return next();
           }
 

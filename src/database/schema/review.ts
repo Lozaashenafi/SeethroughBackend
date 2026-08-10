@@ -37,6 +37,14 @@ export const reviews = pgTable(
     }),
     jobTitle: text('job_title'),
     isVerified: boolean('is_verified').default(false).notNull(),
+    // One-way sha256 fingerprint of normalized title/pros/cons, used for
+    // duplicate detection without storing raw copies.
+    contentFingerprint: text('content_fingerprint'),
+    // Moderation state: published reviews are visible publicly; pending reviews
+    // wait in the admin moderation queue; rejected reviews are never shown.
+    status: text('status', { enum: ['published', 'pending', 'rejected'] })
+      .default('published')
+      .notNull(),
     helpfulCount: integer('helpful_count').default(0).notNull(),
     unhelpfulCount: integer('unhelpful_count').default(0).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

@@ -7,14 +7,23 @@ import { reviewTags } from '../../../database/schema/reviewTag.js';
 import { comments } from '../../../database/schema/comment.js';
 import { reviewVotes } from '../../../database/schema/reviewVote.js';
 import { reports } from '../../../database/schema/report.js';
+import { anonymousIdentities } from '../../../database/schema/anonymousIdentity.js';
 import type { CreateReviewInput } from '../types/reviews.types.js';
 
 type DbClient = typeof db | DatabaseTx;
+
+type CreateReviewRecord = CreateReviewInput & {
+  anonymousId: string;
+  companyId: string;
+  status: 'published' | 'pending' | 'rejected';
+  contentFingerprint: string;
+};
 
 const reviewColumns = {
   id: reviews.id,
   publicId: reviews.publicId,
   anonymousId: reviews.anonymousId,
+  nickname: anonymousIdentities.nickname,
   companyId: reviews.companyId,
   companyName: companies.name,
   companySlug: companies.slug,
@@ -31,6 +40,7 @@ const reviewColumns = {
   employmentStatus: reviews.employmentStatus,
   jobTitle: reviews.jobTitle,
   isVerified: reviews.isVerified,
+  status: reviews.status,
   helpfulCount: reviews.helpfulCount,
   unhelpfulCount: reviews.unhelpfulCount,
   createdAt: reviews.createdAt,
@@ -41,6 +51,7 @@ interface ReviewRow {
   id: number;
   publicId: string;
   anonymousId: string;
+  nickname: string | null;
   companyId: string;
   companyName: string | null;
   companySlug: string | null;
@@ -57,6 +68,7 @@ interface ReviewRow {
   employmentStatus: string | null;
   jobTitle: string | null;
   isVerified: boolean;
+  status: 'published' | 'pending' | 'rejected';
   helpfulCount: number;
   unhelpfulCount: number;
   createdAt: Date;
@@ -64,14 +76,11 @@ interface ReviewRow {
 }
 
 export class ReviewsRepository {
-  async create(input: CreateReviewInput & { anonymousId: string; companyId: string }): Promise<ReviewRow> {
+  async create(input: CreateReviewRecord): Promise<ReviewRow> {
     return this.createWithClient(db, input);
   }
 
-  async createWithClient(
-    client: DbClient,
-    input: CreateReviewInput & { anonymousId: string; companyId: string },
-  ): Promise<ReviewRow> {
+  async createWithClient(client: DbClient, input: CreateReviewRecord): Promise<ReviewRow> {
     const publicId = nanoid(16);
 
     const [review] = await client
@@ -92,6 +101,8 @@ export class ReviewsRepository {
         isCurrentEmployee: input.isCurrentEmployee ?? null,
         employmentStatus: input.employmentStatus ?? null,
         jobTitle: input.jobTitle ?? null,
+        contentFingerprint: input.contentFingerprint,
+        status: input.status,
       })
       .returning();
 
@@ -118,6 +129,7 @@ export class ReviewsRepository {
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
       .where(eq(reviews.publicId, publicId));
     return review ?? null;
   }
@@ -134,7 +146,55 @@ export class ReviewsRepository {
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
       .where(and(eq(reviews.anonymousId, anonymousId), eq(reviews.companyId, companyId)));
+    return review ?? null;
+  }
+
+  /** Most recent review by this identity for the company created within `since`. */
+  async findRecentByAnonymousAndCompany(
+    anonymousId: string,
+    companyId: string,
+    since: Date,
+  ): Promise<ReviewRow | null> {
+    const [review] = await db
+      .select(reviewColumns)
+      .from(reviews)
+      .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
+      .where(
+        and(
+          eq(reviews.anonymousId, anonymousId),
+          eq(reviews.companyId, companyId),
+          sql`${reviews.createdAt} >= ${since}`,
+        ),
+      )
+      .orderBy(desc(reviews.createdAt))
+      .limit(1);
+    return review ?? null;
+  }
+
+  /** Recent published reviews for near-duplicate content screening. */
+  async findRecentForDupCheck(since: Date, limit: number): Promise<ReviewRow[]> {
+    return db
+      .select(reviewColumns)
+      .from(reviews)
+      .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
+      .where(and(eq(reviews.status, 'published'), sql`${reviews.createdAt} >= ${since}`))
+      .orderBy(desc(reviews.createdAt))
+      .limit(limit);
+  }
+
+  /** Find a review whose content fingerprint matches (exact duplicate check). */
+  async findByFingerprint(fingerprint: string): Promise<ReviewRow | null> {
+    const [review] = await db
+      .select(reviewColumns)
+      .from(reviews)
+      .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
+      .where(eq(reviews.contentFingerprint, fingerprint))
+      .limit(1);
     return review ?? null;
   }
 
@@ -143,6 +203,7 @@ export class ReviewsRepository {
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
       .where(eq(reviews.id, id));
     return review ?? null;
   }
@@ -158,11 +219,14 @@ export class ReviewsRepository {
         ? desc(sql`${reviews.helpfulCount} + ${reviews.unhelpfulCount}`)
         : desc(reviews.createdAt);
 
+    const whereClause = and(eq(reviews.companyId, companyId), eq(reviews.status, 'published'));
+
     const data = await db
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .where(eq(reviews.companyId, companyId))
+      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
+      .where(whereClause)
       .orderBy(orderBy)
       .limit(params.limit)
       .offset(offset);
@@ -170,7 +234,7 @@ export class ReviewsRepository {
     const [totalResult] = await db
       .select({ total: count() })
       .from(reviews)
-      .where(eq(reviews.companyId, companyId));
+      .where(whereClause);
 
     return { data, total: totalResult?.total ?? 0 };
   }
@@ -227,26 +291,59 @@ export class ReviewsRepository {
       .where(eq(reviews.id, id));
   }
 
-  async findAll(params: { page: number; limit: number; sortBy?: string }): Promise<{ data: ReviewRow[]; total: number }> {
+  async findAllWithStatus(
+    params: { page: number; limit: number; status?: string; sortBy?: string },
+  ): Promise<{ data: ReviewRow[]; total: number }> {
     const offset = (params.page - 1) * params.limit;
 
     const orderBy = params.sortBy === 'engagement'
       ? desc(sql`${reviews.helpfulCount} + ${reviews.unhelpfulCount}`)
       : desc(reviews.createdAt);
 
+    const conditions: SQL[] = [];
+    if (params.status && params.status !== 'all') {
+      conditions.push(eq(reviews.status, params.status as 'published' | 'pending' | 'rejected'));
+    }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
     const data = await db
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
+      .where(whereClause)
       .orderBy(orderBy)
       .limit(params.limit)
       .offset(offset);
 
     const [totalResult] = await db
       .select({ total: count() })
-      .from(reviews);
+      .from(reviews)
+      .where(whereClause);
 
     return { data, total: totalResult?.total ?? 0 };
+  }
+
+  async updateStatus(id: number, status: 'published' | 'pending' | 'rejected'): Promise<ReviewRow | null> {
+    const [review] = await db
+      .update(reviews)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(reviews.id, id))
+      .returning({ id: reviews.id, publicId: reviews.publicId });
+
+    if (!review) return null;
+    return this.findByPublicId(review.publicId);
+  }
+
+  async setStatusWithClient(
+    client: DbClient,
+    id: number,
+    status: 'published' | 'pending' | 'rejected',
+  ): Promise<void> {
+    await client
+      .update(reviews)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(reviews.id, id));
   }
 
   async getCompanyReviewStats(
@@ -259,7 +356,9 @@ export class ReviewsRepository {
     client: DbClient,
     companyId: string,
   ): Promise<{ averageRating: string | null; reviewCount: number; recommendationRate: number }> {
-    // Aggregate in SQL so we never pull every review row into memory.
+    // Aggregate in SQL so we never pull every review row into memory. Only
+    // published reviews contribute to the public stats — pending/rejected
+    // content must never move the averages or counts.
     const [result] = await client
       .select({
         averageRating: sql<string>`round(avg(${reviews.overallRating}), 1)::text`,
@@ -267,7 +366,7 @@ export class ReviewsRepository {
         recommendationRate: sql<number>`round((count(*) FILTER (WHERE ${reviews.isCurrentEmployee} = true)::numeric / nullif(count(*), 0)) * 100)::int`,
       })
       .from(reviews)
-      .where(eq(reviews.companyId, companyId));
+      .where(and(eq(reviews.companyId, companyId), eq(reviews.status, 'published')));
 
     return {
       averageRating: result?.averageRating ?? null,

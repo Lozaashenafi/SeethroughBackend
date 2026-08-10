@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { commentsController } from '../controller/comments.controller.js';
 import { anonymousIdentity } from '../../../middlewares/anonymousIdentity.middleware.js';
+import { temporarilyBlockedGuard } from '../../../middlewares/temporarilyBlockedGuard.middleware.js';
 import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
@@ -20,6 +21,7 @@ commentsRoutes.get(
 
 commentsRoutes.post(
   '/',
+  temporarilyBlockedGuard(),
   createRateLimiter(RATE_LIMITS.COMMENT_CREATE),
   validate({ body: createCommentSchema }),
   asyncHandler(commentsController.create.bind(commentsController)),

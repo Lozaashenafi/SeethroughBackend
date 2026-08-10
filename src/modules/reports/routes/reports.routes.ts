@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { reportsController } from '../controller/reports.controller.js';
 import { anonymousIdentity } from '../../../middlewares/anonymousIdentity.middleware.js';
 import { adminAuth } from '../../../middlewares/adminAuth.middleware.js';
+import { temporarilyBlockedGuard } from '../../../middlewares/temporarilyBlockedGuard.middleware.js';
 import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
@@ -14,6 +15,7 @@ const reportsRoutes = Router();
 reportsRoutes.post(
   '/',
   anonymousIdentity(),
+  temporarilyBlockedGuard(),
   createRateLimiter(RATE_LIMITS.REPORT),
   validate({ body: createReportSchema }),
   asyncHandler(reportsController.create.bind(reportsController)),

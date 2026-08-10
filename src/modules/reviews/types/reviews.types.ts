@@ -18,6 +18,7 @@ export interface CreateReviewInput {
 export interface ReviewResponse {
   publicId: string;
   companyId: string;
+  nickname: string | null;
   companyName: string | null;
   companySlug: string | null;
   title: string;
@@ -33,6 +34,7 @@ export interface ReviewResponse {
   employmentStatus: string | null;
   jobTitle: string | null;
   isVerified: boolean;
+  status: 'published' | 'pending' | 'rejected';
   helpfulCount: number;
   unhelpfulCount: number;
   createdAt: Date;
@@ -42,6 +44,7 @@ export interface ReviewResponse {
 export function toReviewResponse(review: {
   publicId: string;
   companyId: string;
+  nickname: string | null;
   companyName: string | null;
   companySlug: string | null;
   title: string;
@@ -57,6 +60,7 @@ export function toReviewResponse(review: {
   employmentStatus: string | null;
   jobTitle: string | null;
   isVerified: boolean;
+  status: 'published' | 'pending' | 'rejected';
   helpfulCount: number;
   unhelpfulCount: number;
   createdAt: Date;
@@ -65,6 +69,7 @@ export function toReviewResponse(review: {
   return {
     publicId: review.publicId,
     companyId: review.companyId,
+    nickname: review.nickname,
     companyName: review.companyName,
     companySlug: review.companySlug,
     title: review.title,
@@ -80,6 +85,7 @@ export function toReviewResponse(review: {
     employmentStatus: review.employmentStatus,
     jobTitle: review.jobTitle,
     isVerified: review.isVerified,
+    status: review.status,
     helpfulCount: review.helpfulCount,
     unhelpfulCount: review.unhelpfulCount,
     createdAt: review.createdAt,

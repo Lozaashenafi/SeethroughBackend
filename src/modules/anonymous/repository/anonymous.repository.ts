@@ -20,6 +20,7 @@ export class AnonymousRepository {
       .values({
         publicId: input.publicId,
         sessionTokenHash,
+        nickname: input.nickname,
       })
       .returning();
 
@@ -82,6 +83,36 @@ export class AnonymousRepository {
         isBlocked,
         status: isBlocked ? 'disabled' : 'active',
       })
+      .where(eq(anonymousIdentities.id, id))
+      .returning();
+
+    return identity;
+  }
+
+  async updateNickname(id: string, nickname: string): Promise<AnonymousRow> {
+    const [identity] = await db
+      .update(anonymousIdentities)
+      .set({ nickname, nicknameRegeneratedAt: new Date() })
+      .where(eq(anonymousIdentities.id, id))
+      .returning();
+
+    return identity;
+  }
+
+  async setTempBlocked(id: string, until: Date): Promise<AnonymousRow> {
+    const [identity] = await db
+      .update(anonymousIdentities)
+      .set({ tempBlockedUntil: until })
+      .where(eq(anonymousIdentities.id, id))
+      .returning();
+
+    return identity;
+  }
+
+  async clearTempBlock(id: string): Promise<AnonymousRow> {
+    const [identity] = await db
+      .update(anonymousIdentities)
+      .set({ tempBlockedUntil: null })
       .where(eq(anonymousIdentities.id, id))
       .returning();
 

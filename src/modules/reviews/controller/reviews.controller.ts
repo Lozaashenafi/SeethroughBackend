@@ -18,6 +18,12 @@ class ReviewsController {
     sendSuccess(res, toReviewResponse(review), 'Review retrieved');
   }
 
+  async adminGetByPublicId(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const review = await reviewsService.adminGetByPublicId(publicId);
+    sendSuccess(res, toReviewResponse(review), 'Review retrieved');
+  }
+
   async listByCompany(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { companySlug, sortBy } = req.query as Record<string, string | undefined>;
     const page = Number(req.query.page) || 1;
@@ -40,7 +46,7 @@ class ReviewsController {
       );
     } else {
       // Return all reviews when no company filter is provided
-      const result = await reviewsService.listAll(page, limit, sortBy);
+      const result = await reviewsService.listAll({ page, limit, sortBy });
       sendSuccess(
         res,
         {
@@ -58,11 +64,11 @@ class ReviewsController {
   }
 
   async listAll(req: Request, res: Response, _next: NextFunction): Promise<void> {
-    const { sortBy } = req.query as Record<string, string | undefined>;
+    const { sortBy, status } = req.query as Record<string, string | undefined>;
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
 
-    const result = await reviewsService.listAll(page, limit, sortBy);
+    const result = await reviewsService.listAll({ page, limit, sortBy, status });
     sendSuccess(
       res,
       {
@@ -82,6 +88,13 @@ class ReviewsController {
     const { publicId } = req.params;
     await reviewsService.deleteByPublicId(publicId);
     sendSuccess(res, null, 'Review deleted');
+  }
+
+  async moderate(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const { status } = req.body as { status: 'published' | 'rejected' };
+    const review = await reviewsService.moderate(publicId, status);
+    sendSuccess(res, toReviewResponse(review), `Review ${status === 'published' ? 'approved' : 'rejected'}`);
   }
 }
 

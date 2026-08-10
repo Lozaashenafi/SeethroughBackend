@@ -8,6 +8,11 @@ class AnonymousController {
     sendSuccess(res, toAnonymousResponse(req.anonymous!), 'Anonymous identity retrieved');
   }
 
+  async regenerateNickname(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const identity = await anonymousService.regenerateNickname(req.anonymous!.publicId);
+    sendSuccess(res, toAnonymousResponse(identity), 'Nickname regenerated');
+  }
+
   async list(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const page = Number(req.query.page);
     const limit = Number(req.query.limit);
@@ -39,6 +44,19 @@ class AnonymousController {
     const { publicId } = req.params;
     const identity = await anonymousService.unblock(publicId);
     sendSuccess(res, toAnonymousResponse(identity), 'User unblocked');
+  }
+
+  async tempBlock(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const hours = Math.max(1, Number(req.body?.hours) || 24);
+    const identity = await anonymousService.tempBlock(publicId, hours * 60 * 60 * 1000);
+    sendSuccess(res, toAnonymousResponse(identity), `User temporarily blocked for ${hours} hour(s)`);
+  }
+
+  async clearTempBlock(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const identity = await anonymousService.clearTempBlock(publicId);
+    sendSuccess(res, toAnonymousResponse(identity), 'Temporary block lifted');
   }
 }
 

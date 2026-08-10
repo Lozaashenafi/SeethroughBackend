@@ -20,6 +20,21 @@ export const anonymousIdentities = pgTable(
       length: 255,
     }).notNull().unique(),
 
+    // Public pseudonym (adjective + animal) shown next to reviews. The internal
+    // UUID/publicId is never exposed to other users.
+    nickname: varchar("nickname", { length: 60 }),
+
+    // Set once a nickname has been regenerated — allows exactly one regeneration.
+    nicknameRegeneratedAt: timestamp("nickname_regenerated_at", {
+      withTimezone: true,
+    }),
+
+    // When set in the future, the identity is temporarily blocked from
+    // submitting content (spam/abuse). Read-only browsing still works.
+    tempBlockedUntil: timestamp("temp_blocked_until", {
+      withTimezone: true,
+    }),
+
     status: text("status", { enum: ["active", "disabled", "flagged"] })
       .default("active")
       .notNull(),

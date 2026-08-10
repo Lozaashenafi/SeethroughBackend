@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { votesController } from '../controller/votes.controller.js';
 import { anonymousIdentity } from '../../../middlewares/anonymousIdentity.middleware.js';
+import { temporarilyBlockedGuard } from '../../../middlewares/temporarilyBlockedGuard.middleware.js';
 import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
@@ -13,6 +14,7 @@ votesRoutes.use(anonymousIdentity());
 
 votesRoutes.post(
   '/',
+  temporarilyBlockedGuard(),
   createRateLimiter(RATE_LIMITS.REACTION),
   validate({ body: createVoteSchema }),
   asyncHandler(votesController.vote.bind(votesController)),

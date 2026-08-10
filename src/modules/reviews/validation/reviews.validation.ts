@@ -25,6 +25,11 @@ export const reviewPublicIdParamsSchema = z.object({
 export const listReviewsQuerySchema = z.object({
   companySlug: z.string().optional(),
   sortBy: z.enum(['recent', 'engagement']).optional(),
+  status: z.enum(['published', 'pending', 'rejected', 'all']).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(50).default(20),
+});
+
+export const moderateReviewSchema = z.object({
+  status: z.enum(['published', 'rejected']),
 });

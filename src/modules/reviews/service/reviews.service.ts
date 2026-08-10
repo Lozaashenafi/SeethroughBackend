@@ -2,7 +2,19 @@ import { reviewsRepository } from '../repository/reviews.repository.js';
 import { companiesRepository } from '../../companies/repository/companies.repository.js';
 import { db } from '../../../database/db.js';
 import { AppError } from '../../../shared/errors/AppError.js';
+import {
+  contentFingerprint,
+  textSimilarity,
+  NEAR_DUPLICATE_THRESHOLD,
+} from '../../../shared/utils/index.js';
 import type { CreateReviewInput } from '../types/reviews.types.js';
+
+// One review per company per identity per 30 days.
+const REVIEW_REPEAT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+// Near-duplicate screening window — how far back we compare content.
+const DUP_SCREEN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+// How many recently-published reviews we compare against for near-duplicates.
+const DUP_SCREEN_LIMIT = 200;
 
 class ReviewsService {
   async create(input: CreateReviewInput & { anonymousId: string }) {
@@ -12,14 +24,15 @@ class ReviewsService {
       throw new AppError('Company not found', 404);
     }
 
-    // A reviewer should not review the same company more than once. The rate
-    // limit alone is not a reliable guard, so enforce it here too.
-    const existing = await reviewsRepository.findByAnonymousAndCompany(
+    // One review per company per identity per 30 days. The rate limit alone is
+    // not a reliable guard, so enforce the window here too.
+    const recent = await reviewsRepository.findRecentByAnonymousAndCompany(
       input.anonymousId,
       company.id,
+      new Date(Date.now() - REVIEW_REPEAT_WINDOW_MS),
     );
-    if (existing) {
-      throw new AppError('You have already reviewed this company.', 409);
+    if (recent) {
+      throw new AppError('You have already reviewed this company recently. Please try again later.', 409);
     }
 
     // Validate ratings are within range
@@ -36,6 +49,31 @@ class ReviewsService {
       if (rating < 1 || rating > 5) {
         throw new AppError('Ratings must be between 1 and 5', 400);
       }
+    }
+
+    // Duplicate / near-identical detection. A reviewer resubmitting their own
+    // content is rejected outright; content nearly identical to someone else's
+    // recent published review is routed to moderation.
+    const fingerprint = contentFingerprint(input.title, input.pros, input.cons);
+    const exactDup = await reviewsRepository.findByFingerprint(fingerprint);
+    if (exactDup) {
+      throw new AppError('This review appears to be a duplicate. If this was a mistake, please try again.', 409);
+    }
+
+    let status: 'published' | 'pending' | 'rejected' = 'published';
+    const recentPublished = await reviewsRepository.findRecentForDupCheck(
+      new Date(Date.now() - DUP_SCREEN_WINDOW_MS),
+      DUP_SCREEN_LIMIT,
+    );
+    const nearDup = recentPublished.find(
+      (r) =>
+        textSimilarity(input.title, r.title) >= NEAR_DUPLICATE_THRESHOLD ||
+        textSimilarity(input.pros ?? '', r.pros ?? '') >= NEAR_DUPLICATE_THRESHOLD ||
+        textSimilarity(input.cons ?? '', r.cons ?? '') >= NEAR_DUPLICATE_THRESHOLD,
+    );
+
+    if (nearDup) {
+      status = 'pending';
     }
 
     // Review insert, tag links and company stats update are committed
@@ -58,10 +96,15 @@ class ReviewsService {
         employmentStatus: input.employmentStatus,
         jobTitle: input.jobTitle,
         tagIds: input.tagIds,
+        status,
+        contentFingerprint: fingerprint,
       });
 
-      const stats = await reviewsRepository.getCompanyReviewStatsWithClient(tx, company.id);
-      await companiesRepository.updateStatsWithClient(tx, company.id, stats);
+      // Only published reviews count toward the company's public stats.
+      if (status === 'published') {
+        const stats = await reviewsRepository.getCompanyReviewStatsWithClient(tx, company.id);
+        await companiesRepository.updateStatsWithClient(tx, company.id, stats);
+      }
 
       return created;
     });
@@ -70,6 +113,17 @@ class ReviewsService {
   }
 
   async getByPublicId(publicId: string) {
+    const review = await reviewsRepository.findByPublicId(publicId);
+    if (!review) {
+      throw new AppError('Review not found', 404);
+    }
+    if (review.status !== 'published') {
+      throw new AppError('Review not found', 404);
+    }
+    return review;
+  }
+
+  async adminGetByPublicId(publicId: string) {
     const review = await reviewsRepository.findByPublicId(publicId);
     if (!review) {
       throw new AppError('Review not found', 404);
@@ -107,8 +161,34 @@ class ReviewsService {
     }
   }
 
-  async listAll(page: number, limit: number, sortBy?: string) {
-    return reviewsRepository.findAll({ page, limit, sortBy });
+  async listAll(params: { page: number; limit: number; status?: string; sortBy?: string }) {
+    // Public consumers never pass a status; only published reviews may be shown.
+    // Admin callers pass an explicit status (or 'all') via the admin endpoint.
+    const status = params.status ?? 'published';
+    return reviewsRepository.findAllWithStatus({ ...params, status });
+  }
+
+  async moderate(publicId: string, status: 'published' | 'rejected') {
+    const review = await reviewsRepository.findByPublicId(publicId);
+    if (!review) {
+      throw new AppError('Review not found', 404);
+    }
+    if (review.status === 'published' && status === 'published') {
+      throw new AppError('Review is already published', 409);
+    }
+
+    const updated = await reviewsRepository.updateStatus(review.id, status);
+    if (!updated) {
+      throw new AppError('Failed to update review status', 500);
+    }
+
+    // Recompute company stats when a review transitions in/out of the public set.
+    await db.transaction(async (tx) => {
+      const stats = await reviewsRepository.getCompanyReviewStatsWithClient(tx, review.companyId);
+      await companiesRepository.updateStatsWithClient(tx, review.companyId, stats);
+    });
+
+    return updated;
   }
 }
 

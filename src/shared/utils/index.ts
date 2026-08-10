@@ -25,3 +25,10 @@ export function asyncHandler(
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 }
+
+export { generateNickname } from './nickname.js';
+export {
+  contentFingerprint,
+  textSimilarity,
+  NEAR_DUPLICATE_THRESHOLD,
+} from './duplicateDetection.js';

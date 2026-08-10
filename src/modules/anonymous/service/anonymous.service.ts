@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import { anonymousRepository } from '../repository/anonymous.repository.js';
 import { ANONYMOUS_ID_LENGTH } from '../../../shared/constants/index.js';
+import { generateNickname } from '../../../shared/utils/index.js';
 import { AppError } from '../../../shared/errors/AppError.js';
 import type { AnonymousIdentity } from '../../../shared/types/index.js';
 import type { CreateAnonymousResult } from '../types/anonymous.types.js';
@@ -29,7 +30,7 @@ function pruneLastSeenCache(now: number): void {
 class AnonymousService {
   async create(): Promise<CreateAnonymousResult> {
     const publicId = nanoid(ANONYMOUS_ID_LENGTH);
-    return anonymousRepository.create({ publicId });
+    return anonymousRepository.create({ publicId, nickname: generateNickname() });
   }
 
   async findByPublicId(publicId: string): Promise<AnonymousIdentity | null> {
@@ -82,6 +83,51 @@ class AnonymousService {
       throw new AppError('Identity is not blocked', 409);
     }
     return anonymousRepository.setBlocked(identity.id, false);
+  }
+
+  /**
+   * Regenerate the public nickname for an identity. Allowed at most once per
+   * identity — after that the nickname is permanent so a reviewer can't keep
+   * cycling pseudonyms to dodge being recognized by other users.
+   */
+  async regenerateNickname(publicId: string): Promise<AnonymousIdentity> {
+    const identity = await anonymousRepository.findByPublicId(publicId);
+    if (!identity) {
+      throw new AppError('Identity not found', 404);
+    }
+    if (identity.isBlocked) {
+      throw new AppError('Identity is blocked', 403);
+    }
+    if (identity.nicknameRegeneratedAt) {
+      throw new AppError('Nickname can only be regenerated once', 409);
+    }
+    return anonymousRepository.updateNickname(identity.id, generateNickname());
+  }
+
+  /** Backfill a nickname for identities created before nicknames existed. */
+  async ensureNickname(identity: AnonymousIdentity): Promise<AnonymousIdentity> {
+    if (identity.nickname) return identity;
+    return anonymousRepository.updateNickname(identity.id, generateNickname());
+  }
+
+  async isTemporarilyBlocked(identity: AnonymousIdentity): Promise<boolean> {
+    return Boolean(identity.tempBlockedUntil && identity.tempBlockedUntil.getTime() > Date.now());
+  }
+
+  async tempBlock(publicId: string, durationMs: number): Promise<AnonymousIdentity> {
+    const identity = await anonymousRepository.findByPublicId(publicId);
+    if (!identity) {
+      throw new AppError('Identity not found', 404);
+    }
+    return anonymousRepository.setTempBlocked(identity.id, new Date(Date.now() + durationMs));
+  }
+
+  async clearTempBlock(publicId: string): Promise<AnonymousIdentity> {
+    const identity = await anonymousRepository.findByPublicId(publicId);
+    if (!identity) {
+      throw new AppError('Identity not found', 404);
+    }
+    return anonymousRepository.clearTempBlock(identity.id);
   }
 }
 

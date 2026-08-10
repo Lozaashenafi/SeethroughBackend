@@ -6,7 +6,7 @@ import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.j
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
 import { RATE_LIMITS } from '../../../shared/constants/index.js';
-import { listIdentitiesQuerySchema } from '../validation/anonymous.validation.js';
+import { listIdentitiesQuerySchema, tempBlockSchema } from '../validation/anonymous.validation.js';
 
 const anonymousRoutes = Router();
 
@@ -17,6 +17,12 @@ anonymousRoutes.get(
   '/me',
   createRateLimiter(RATE_LIMITS.DEFAULT),
   asyncHandler(anonymousController.me.bind(anonymousController)),
+);
+
+anonymousRoutes.patch(
+  '/me/nickname',
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  asyncHandler(anonymousController.regenerateNickname.bind(anonymousController)),
 );
 
 // Admin-only routes
@@ -40,6 +46,21 @@ anonymousRoutes.patch(
   adminAuth(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   asyncHandler(anonymousController.unblock.bind(anonymousController)),
+);
+
+anonymousRoutes.patch(
+  '/admin/:publicId/temp-block',
+  adminAuth(),
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ body: tempBlockSchema }),
+  asyncHandler(anonymousController.tempBlock.bind(anonymousController)),
+);
+
+anonymousRoutes.patch(
+  '/admin/:publicId/clear-temp-block',
+  adminAuth(),
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  asyncHandler(anonymousController.clearTempBlock.bind(anonymousController)),
 );
 
 export { anonymousRoutes };
