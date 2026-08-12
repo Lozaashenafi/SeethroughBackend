@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { companiesController } from '../controller/companies.controller.js';
 import { anonymousIdentity } from '../../../middlewares/anonymousIdentity.middleware.js';
 import { adminAuth } from '../../../middlewares/adminAuth.middleware.js';
+import { temporarilyBlockedGuard } from '../../../middlewares/temporarilyBlockedGuard.middleware.js';
 import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
@@ -44,11 +45,14 @@ companiesRoutes.get(
   asyncHandler(companiesController.getBySlug.bind(companiesController)),
 );
 
-// Public — anyone can create a company
+// Public — anyone can create a company, but identities under a temporary
+// spam/abuse restriction are blocked (consistent with all other content
+// submission endpoints).
 companiesRoutes.post(
   '/',
   anonymousIdentity(),
-  createRateLimiter(RATE_LIMITS.REVIEW_CREATE),
+  temporarilyBlockedGuard(),
+  createRateLimiter(RATE_LIMITS.COMPANY_CREATE),
   validate({ body: createCompanySchema }),
   asyncHandler(companiesController.create.bind(companiesController)),
 );

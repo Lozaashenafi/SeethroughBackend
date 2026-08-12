@@ -150,6 +150,81 @@ describe('Admin user management', () => {
     expect(missing.status).toBe(404);
   });
 
+  it('permanently deletes a user and their content; the same browser returns fresh', async () => {
+    const { cookie, publicId } = await freshIdentity();
+    const companySlug = await createTestCompany(cookie, 'deleteuser');
+
+    const reviewRes = await apiCall('post', '/api/v1/reviews', {
+      cookie,
+      body: {
+        companySlug,
+        title: uniq('Delete user review title'),
+        pros: uniq('Delete user pros'),
+        cons: uniq('Delete user cons'),
+        overallRating: 4,
+      },
+    });
+    expect(reviewRes.status).toBe(201);
+    const reviewPublicId = reviewRes.body.data.publicId as string;
+
+    const commentRes = await apiCall('post', '/api/v1/comments', {
+      cookie,
+      body: { reviewPublicId, content: uniq('Delete user comment') },
+    });
+    expect(commentRes.status).toBe(201);
+
+    const voteRes = await apiCall('post', '/api/v1/votes', {
+      cookie,
+      body: { reviewPublicId, voteType: 'helpful' },
+    });
+    expect(voteRes.status).toBe(200);
+
+    const reportRes = await apiCall('post', '/api/v1/reports', {
+      cookie,
+      body: { reviewPublicId, reason: uniq('Delete user report reason') },
+    });
+    expect(reportRes.status).toBe(201);
+
+    // Company stats reflect the review before deletion.
+    const companyBefore = await apiCall('get', `/api/v1/companies/${companySlug}`, { cookie });
+    expect(Number(companyBefore.body.data.reviewCount)).toBe(1);
+
+    // Admin permanently deletes the identity.
+    const del = await apiCall('delete', `/api/v1/anonymous/admin/${publicId}`, {
+      cookie: adminCookie,
+    });
+    expect(del.status).toBe(200);
+
+    // Identity is gone from the admin list.
+    const list = await apiCall('get', '/api/v1/anonymous/admin/list', {
+      cookie: adminCookie,
+      query: { search: publicId, page: '1', limit: '50' },
+    });
+    const ids = (list.body.data?.identities ?? []).map((i: { publicId: string }) => i.publicId);
+    expect(ids).not.toContain(publicId);
+
+    // Activity lookup now 404s.
+    const activity = await apiCall('get', `/api/v1/anonymous/admin/${publicId}/activity`, {
+      cookie: adminCookie,
+      query: { page: '1', limit: '20' },
+    });
+    expect(activity.status).toBe(404);
+
+    // The review (and everything attached to it) is gone from the public API.
+    const review = await apiCall('get', `/api/v1/reviews/${reviewPublicId}`, { cookie });
+    expect(review.status).toBe(404);
+
+    // Company stats were recomputed after the review disappeared.
+    const companyAfter = await apiCall('get', `/api/v1/companies/${companySlug}`, { cookie });
+    expect(Number(companyAfter.body.data.reviewCount)).toBe(0);
+
+    // Same browser (old cookie) is minted a BRAND-NEW identity on next visit.
+    const revisit = await apiCall('get', '/api/v1/anonymous/me', { cookie });
+    expect(revisit.status).toBe(200);
+    expect(revisit.body.data.publicId).toBeDefined();
+    expect(revisit.body.data.publicId).not.toBe(publicId);
+  });
+
   it('activity aggregates reviews, comments, votes, and reports without leaking internals', async () => {
     const { cookie, publicId } = await freshIdentity();
     const companySlug = await createTestCompany(cookie, 'activity');

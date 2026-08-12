@@ -1,4 +1,5 @@
 import { eq, desc, count } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { nanoid } from 'nanoid';
 import { db } from '../../../database/db.js';
 import { comments } from '../../../database/schema/comment.js';
@@ -21,6 +22,9 @@ interface CommentRow {
   anonymousId: string;
   reviewId: number;
   parentId: number | null;
+  // Public identifier of the parent comment. Only present when a parent was
+  // joined (list) or supplied at creation time — never leaks the internal id.
+  parentPublicId?: string | null;
   content: string;
   helpfulCount: number;
   createdAt: Date;
@@ -33,6 +37,7 @@ export class CommentsRepository {
     reviewId: number;
     content: string;
     parentId?: number;
+    parentPublicId?: string;
   }): Promise<CommentRow> {
     const publicId = nanoid(16);
 
@@ -47,7 +52,10 @@ export class CommentsRepository {
       })
       .returning();
 
-    return comment;
+    return {
+      ...comment,
+      parentPublicId: input.parentPublicId ?? null,
+    };
   }
 
   async findByReviewId(
@@ -56,9 +64,25 @@ export class CommentsRepository {
   ): Promise<{ data: CommentRow[]; total: number }> {
     const offset = (params.page - 1) * params.limit;
 
+    // Self-join on the parent comment so replies expose the parent's PUBLIC id
+    // instead of the internal DB id.
+    const parentComments = alias(comments, 'parent_comments');
+
     const data = await db
-      .select()
+      .select({
+        id: comments.id,
+        publicId: comments.publicId,
+        anonymousId: comments.anonymousId,
+        reviewId: comments.reviewId,
+        parentId: comments.parentId,
+        parentPublicId: parentComments.publicId,
+        content: comments.content,
+        helpfulCount: comments.helpfulCount,
+        createdAt: comments.createdAt,
+        updatedAt: comments.updatedAt,
+      })
       .from(comments)
+      .leftJoin(parentComments, eq(comments.parentId, parentComments.id))
       .where(eq(comments.reviewId, reviewId))
       .orderBy(desc(comments.createdAt))
       .limit(params.limit)
@@ -103,14 +127,6 @@ export class CommentsRepository {
       .where(eq(comments.anonymousId, anonymousId));
 
     return { data, total: totalResult?.total ?? 0 };
-  }
-
-  async findById(id: number): Promise<CommentRow | null> {
-    const [comment] = await db
-      .select()
-      .from(comments)
-      .where(eq(comments.id, id));
-    return comment ?? null;
   }
 
   async findByPublicId(publicId: string): Promise<CommentRow | null> {

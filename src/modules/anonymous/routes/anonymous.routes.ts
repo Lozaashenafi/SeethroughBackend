@@ -10,6 +10,7 @@ import {
   listIdentitiesQuerySchema,
   activityQuerySchema,
   tempBlockSchema,
+  updateNicknameSchema,
 } from '../validation/anonymous.validation.js';
 
 const anonymousRoutes = Router();
@@ -26,7 +27,8 @@ anonymousRoutes.get(
 anonymousRoutes.patch(
   '/me/nickname',
   createRateLimiter(RATE_LIMITS.DEFAULT),
-  asyncHandler(anonymousController.regenerateNickname.bind(anonymousController)),
+  validate({ body: updateNicknameSchema }),
+  asyncHandler(anonymousController.updateNickname.bind(anonymousController)),
 );
 
 // Admin-only routes
@@ -80,6 +82,16 @@ anonymousRoutes.get(
   adminAuth(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   asyncHandler(anonymousController.getReviews.bind(anonymousController)),
+);
+
+// Permanently delete an identity and ALL of its content (reviews, comments,
+// votes, reports). The identity's cookies become orphaned, so the same browser
+// is minted a fresh identity on its next visit.
+anonymousRoutes.delete(
+  '/admin/:publicId',
+  adminAuth(),
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  asyncHandler(anonymousController.deleteIdentity.bind(anonymousController)),
 );
 
 export { anonymousRoutes };

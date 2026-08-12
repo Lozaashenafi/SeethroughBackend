@@ -10,6 +10,7 @@ export const ADMIN_SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export const RATE_LIMITS = {
   REVIEW_CREATE: { windowMs: 24 * 60 * 60 * 1000, max: 3 },
+  COMPANY_CREATE: { windowMs: 24 * 60 * 60 * 1000, max: 10 },
   COMMENT_CREATE: { windowMs: 24 * 60 * 60 * 1000, max: 20 },
   REACTION: { windowMs: 24 * 60 * 60 * 1000, max: 50 },
   REPORT: { windowMs: 24 * 60 * 60 * 1000, max: 10 },

@@ -8,9 +8,14 @@ class AnonymousController {
     sendSuccess(res, toAnonymousResponse(req.anonymous!), 'Anonymous identity retrieved');
   }
 
-  async regenerateNickname(req: Request, res: Response, _next: NextFunction): Promise<void> {
-    const identity = await anonymousService.regenerateNickname(req.anonymous!.publicId);
-    sendSuccess(res, toAnonymousResponse(identity), 'Nickname regenerated');
+  async updateNickname(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const nickname = (req.body as { nickname?: string } | undefined)?.nickname;
+    const identity = await anonymousService.changeNickname(req.anonymous!.publicId, nickname);
+    sendSuccess(
+      res,
+      toAnonymousResponse(identity),
+      nickname ? 'Nickname updated' : 'Nickname generated',
+    );
   }
 
   async list(req: Request, res: Response, _next: NextFunction): Promise<void> {
@@ -73,6 +78,12 @@ class AnonymousController {
     const { publicId } = req.params;
     const reviews = await anonymousService.getAllReviews(publicId);
     sendSuccess(res, { reviews }, 'Identity reviews retrieved');
+  }
+
+  async deleteIdentity(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    await anonymousService.deleteIdentity(publicId);
+    sendSuccess(res, null, 'Identity and all associated content deleted');
   }
 }
 

@@ -74,6 +74,65 @@ describe('Anonymous identity behavior', () => {
     expect(secondRes.status).toBe(409);
   });
 
+  it('sets a custom nickname exactly once', async () => {
+    const { cookie } = await freshIdentity();
+
+    const setRes = await apiCall('patch', '/api/v1/anonymous/me/nickname', {
+      cookie,
+      body: { nickname: 'Brave Falcon' },
+    });
+    expect(setRes.status).toBe(200);
+    expect(setRes.body.data.nickname).toBe('Brave Falcon');
+    expect(setRes.body.data.nicknameRegeneratedAt).toBeDefined();
+
+    // The one-time budget is now spent — a second change is rejected.
+    const second = await apiCall('patch', '/api/v1/anonymous/me/nickname', {
+      cookie,
+      body: { nickname: 'Silent Owl' },
+    });
+    expect(second.status).toBe(409);
+  });
+
+  it('rejects invalid or oversized custom nicknames', async () => {
+    const { cookie } = await freshIdentity();
+
+    // HTML/angle brackets are rejected outright.
+    const badChars = await apiCall('patch', '/api/v1/anonymous/me/nickname', {
+      cookie,
+      body: { nickname: '<script>alert(1)</script>' },
+    });
+    expect(badChars.status).toBe(400);
+
+    // Over the 30-character limit.
+    const tooLong = await apiCall('patch', '/api/v1/anonymous/me/nickname', {
+      cookie,
+      body: { nickname: 'x'.repeat(31) },
+    });
+    expect(tooLong.status).toBe(400);
+  });
+
+  it('saving the current nickname does not spend the change budget', async () => {
+    const { cookie } = await freshIdentity();
+    const before = await apiCall('get', '/api/v1/anonymous/me', { cookie });
+    const nickname = before.body.data.nickname as string;
+
+    const same = await apiCall('patch', '/api/v1/anonymous/me/nickname', {
+      cookie,
+      body: { nickname },
+    });
+    expect(same.status).toBe(200);
+    expect(same.body.data.nickname).toBe(nickname);
+    expect(same.body.data.nicknameRegeneratedAt).toBeNull();
+
+    // Budget still available — a real change works afterwards.
+    const change = await apiCall('patch', '/api/v1/anonymous/me/nickname', {
+      cookie,
+      body: { nickname: 'Midnight Raven' },
+    });
+    expect(change.status).toBe(200);
+    expect(change.body.data.nickname).toBe('Midnight Raven');
+  });
+
   it('rejects a second review for the same company within 30 days', async () => {
     const { cookie } = await freshIdentity();
     const companySlug = await createTestCompany(cookie, 'repeat');

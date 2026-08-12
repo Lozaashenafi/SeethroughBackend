@@ -141,6 +141,24 @@ pnpm dev
 | `pnpm db:push` | Push schema to database |
 | `pnpm db:studio` | Open Drizzle Studio |
 
+### Deploying to production (Render / Vercel)
+
+The server **auto-applies pending migrations at boot**, so the schema always
+matches the deployed code — no manual step needed after a deploy.
+
+If a deploy was previously pushed while migrations were pending, the quickest
+fix is to run them once against the production database:
+
+```bash
+# From the backend directory, with your production DATABASE_URL (Render →
+# your Postgres instance → connection string):
+DATABASE_URL="postgres://..." pnpm db:migrate
+```
+
+Then redeploy (or just restart the service) — the app will migrate on boot
+anyway. If the companies list is empty after migrating, re-run the seed:
+`DATABASE_URL="postgres://..." pnpm db:seed`.
+
 ## API Endpoints
 
 ### Health Check

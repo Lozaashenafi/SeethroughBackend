@@ -1,6 +1,8 @@
 import { nanoid } from 'nanoid';
+import { db } from '../../../database/db.js';
 import { anonymousRepository } from '../repository/anonymous.repository.js';
 import { reviewsRepository } from '../../reviews/repository/reviews.repository.js';
+import { companiesRepository } from '../../companies/repository/companies.repository.js';
 import { commentsRepository } from '../../comments/repository/comments.repository.js';
 import { votesRepository } from '../../votes/repository/votes.repository.js';
 import { reportsRepository } from '../../reports/repository/reports.repository.js';
@@ -101,11 +103,15 @@ class AnonymousService {
   }
 
   /**
-   * Regenerate the public nickname for an identity. Allowed at most once per
-   * identity — after that the nickname is permanent so a reviewer can't keep
+   * Set or regenerate the public nickname for an identity. Allowed at most once
+   * per identity — after that the nickname is permanent so a reviewer can't keep
    * cycling pseudonyms to dodge being recognized by other users.
+   *
+   * - nickname provided  → used verbatim (character/length rules enforced by
+   *   the route validation layer)
+   * - nickname omitted   → the server picks a fresh auto-generated one
    */
-  async regenerateNickname(publicId: string): Promise<AnonymousIdentity> {
+  async changeNickname(publicId: string, nickname?: string): Promise<AnonymousIdentity> {
     const identity = await anonymousRepository.findByPublicId(publicId);
     if (!identity) {
       throw new AppError('Identity not found', 404);
@@ -114,15 +120,51 @@ class AnonymousService {
       throw new AppError('Identity is blocked', 403);
     }
     if (identity.nicknameRegeneratedAt) {
-      throw new AppError('Nickname can only be regenerated once', 409);
+      throw new AppError('Nickname can only be changed once', 409);
     }
-    return anonymousRepository.updateNickname(identity.id, generateNickname());
+
+    const requested = nickname?.trim();
+    // Saving the exact current name is a no-op and must NOT consume the
+    // one-time change budget.
+    if (requested && requested === identity.nickname) {
+      return identity;
+    }
+
+    const next = requested || generateNickname();
+    return anonymousRepository.updateNickname(identity.id, next);
   }
 
   /** Backfill a nickname for identities created before nicknames existed. */
   async ensureNickname(identity: AnonymousIdentity): Promise<AnonymousIdentity> {
     if (identity.nickname) return identity;
-    return anonymousRepository.updateNickname(identity.id, generateNickname());
+    // Backfill must NOT consume the identity's one-time regeneration right
+    // (updateNickname sets nicknameRegeneratedAt), so use the dedicated method.
+    return anonymousRepository.backfillNickname(identity.id, generateNickname());
+  }
+
+  /**
+   * Permanently delete an identity and ALL of its content (reviews, comments,
+   * votes, reports) in a single transaction. The identity's cookies become
+   * orphaned server-side: the next visit from that browser mints a brand-new
+   * identity, so the same person returns as a fresh user. Company stats are
+   * recomputed for every affected company so the denormalized counters never
+   * drift from the actual review set.
+   */
+  async deleteIdentity(publicId: string): Promise<void> {
+    const identity = await anonymousRepository.findByPublicId(publicId);
+    if (!identity) {
+      throw new AppError('Identity not found', 404);
+    }
+
+    await db.transaction(async (tx) => {
+      const affectedCompanyIds = await anonymousRepository.deleteContentWithClient(tx, identity.id);
+      await anonymousRepository.deleteWithClient(tx, identity.id);
+
+      for (const companyId of affectedCompanyIds) {
+        const stats = await reviewsRepository.getCompanyReviewStatsWithClient(tx, companyId);
+        await companiesRepository.updateStatsWithClient(tx, companyId, stats);
+      }
+    });
   }
 
   async isTemporarilyBlocked(identity: AnonymousIdentity): Promise<boolean> {

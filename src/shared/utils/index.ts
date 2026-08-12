@@ -1,10 +1,38 @@
 import { z } from 'zod';
 import { Request, Response, NextFunction } from 'express';
 
+// Script/style blocks are removed WITH their content (a tag-only regex would
+// leave the script body behind). Case-insensitive and tolerant of attributes.
+// The closing tag is matched via a literal alternation instead of a \1
+// backreference because JS backreferences are case-sensitive even with the
+// 'i' flag — a mixed-case `</SCRIPT>` closer must still close the block.
+const SCRIPT_STYLE_BLOCK_RE = /<(script|style)[^>]*>[\s\S]*?<\/(?:script|style)\s*>/gi;
+// HTML comments may hide markup from the tag regex.
+const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
 const HTML_TAG_RE = /<[^>]*>/g;
+const STRAY_ANGLE_BRACKET_RE = /[<>]/g;
+const COLLAPSE_WS_RE = /\s+/g;
 
 export function stripHtml(input: string): string {
-  return input.replace(HTML_TAG_RE, '');
+  let result = input
+    .replace(SCRIPT_STYLE_BLOCK_RE, ' ')
+    .replace(HTML_COMMENT_RE, ' ');
+
+  // A single pass misses obfuscated/overlapping markup such as
+  // "<scr<script>ipt>alert(1)</scr</script>ipt>". Loop until stable — every
+  // pass only removes characters, so this always terminates.
+  let cleaned: string;
+  do {
+    cleaned = result;
+    result = cleaned.replace(HTML_TAG_RE, ' ');
+  } while (result !== cleaned);
+
+  // Deliberately drop any angle brackets left over in plain text (e.g. a bare
+  // "<" or ">"). Safety takes precedence over preserving comparison operators
+  // like "salary > market" — brackets are never needed for valid review prose.
+  result = result.replace(STRAY_ANGLE_BRACKET_RE, ' ');
+
+  return result.replace(COLLAPSE_WS_RE, ' ').trim();
 }
 
 export function sanitizedString(minLength?: number, maxLength?: number) {

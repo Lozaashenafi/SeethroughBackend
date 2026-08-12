@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import { db, closePool } from './db.js';
@@ -25,7 +25,8 @@ const generateSlug = (text: string): string => {
     .replace(/\s+/g, "-") 
     .replace(/[^\w\u1200-\u137F-]+/g, "") 
     .replace(/\-\-+/g, "-") 
-    .concat("-" + Math.random().toString(36).substring(2, 7)); // Ensure uniqueness
+    // Ensure uniqueness with a CSPRNG suffix (hex) instead of Math.random().
+    .concat("-" + randomBytes(4).toString("hex"));
 };
 
 async function seed(): Promise<void> {

@@ -7,7 +7,7 @@ class CommentsService {
     anonymousId: string;
     reviewPublicId: string;
     content: string;
-    parentId?: number;
+    parentPublicId?: string;
   }) {
     // Look up the review
     const review = await reviewsRepository.findByPublicId(input.reviewPublicId);
@@ -15,23 +15,26 @@ class CommentsService {
       throw new AppError('Review not found', 404);
     }
 
-    // If parentId is provided, verify it exists
-    if (input.parentId) {
-      const parentComment = await commentsRepository.findById(input.parentId);
+    // If a parent is referenced, resolve its publicId to the internal DB id
+    // and verify it exists and belongs to the same review.
+    let parentId: number | undefined;
+    if (input.parentPublicId) {
+      const parentComment = await commentsRepository.findByPublicId(input.parentPublicId);
       if (!parentComment) {
         throw new AppError('Parent comment not found', 404);
       }
-      // Ensure parent comment belongs to the same review
       if (parentComment.reviewId !== review.id) {
         throw new AppError('Parent comment does not belong to this review', 400);
       }
+      parentId = parentComment.id;
     }
 
     return commentsRepository.create({
       anonymousId: input.anonymousId,
       reviewId: review.id,
       content: input.content,
-      parentId: input.parentId,
+      parentId,
+      parentPublicId: input.parentPublicId,
     });
   }
 

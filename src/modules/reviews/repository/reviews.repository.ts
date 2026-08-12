@@ -276,42 +276,37 @@ export class ReviewsRepository {
     return { data, total: totalResult?.total ?? 0 };
   }
 
-  async deleteByPublicId(publicId: string): Promise<boolean> {
-    return this.deleteByPublicIdWithClient(db, publicId);
-  }
-
   async deleteByPublicIdWithClient(client: DbClient, publicId: string): Promise<boolean> {
     // First find the review to get its internal ID for child records
     const review = await this.findByPublicIdWithClient(client, publicId);
     if (!review) return false;
 
-    // Cascade delete in a single transaction for atomicity
-    return client.transaction(async (tx) => {
-      // Collect comment IDs so reports referencing them can be removed too
-      const reviewComments = await tx
-        .select({ id: comments.id })
-        .from(comments)
-        .where(eq(comments.reviewId, review.id));
-      const commentIds = reviewComments.map((c) => c.id);
+    // The service wraps this in an outer db.transaction(), so no nested
+    // transaction is needed here — the caller already guarantees atomicity.
+    // Collect comment IDs so reports referencing them can be removed too
+    const reviewComments = await client
+      .select({ id: comments.id })
+      .from(comments)
+      .where(eq(comments.reviewId, review.id));
+    const commentIds = reviewComments.map((c) => c.id);
 
-      // Delete child records first to avoid FK violations.
-      // Reports may reference the review directly or one of its comments.
-      const reportConditions: SQL[] = [eq(reports.reviewId, review.id)];
-      if (commentIds.length > 0) {
-        reportConditions.push(inArray(reports.commentId, commentIds));
-      }
+    // Delete child records first to avoid FK violations.
+    // Reports may reference the review directly or one of its comments.
+    const reportConditions: SQL[] = [eq(reports.reviewId, review.id)];
+    if (commentIds.length > 0) {
+      reportConditions.push(inArray(reports.commentId, commentIds));
+    }
 
-      await tx.delete(reports).where(or(...reportConditions));
-      await tx.delete(comments).where(eq(comments.reviewId, review.id));
-      await tx.delete(reviewVotes).where(eq(reviewVotes.reviewId, review.id));
-      await tx.delete(reviewTags).where(eq(reviewTags.reviewId, review.id));
+    await client.delete(reports).where(or(...reportConditions));
+    await client.delete(comments).where(eq(comments.reviewId, review.id));
+    await client.delete(reviewVotes).where(eq(reviewVotes.reviewId, review.id));
+    await client.delete(reviewTags).where(eq(reviewTags.reviewId, review.id));
 
-      const [deleted] = await tx
-        .delete(reviews)
-        .where(eq(reviews.publicId, publicId))
-        .returning({ id: reviews.id });
-      return !!deleted;
-    });
+    const [deleted] = await client
+      .delete(reviews)
+      .where(eq(reviews.publicId, publicId))
+      .returning({ id: reviews.id });
+    return !!deleted;
   }
 
   async updateCounts(
