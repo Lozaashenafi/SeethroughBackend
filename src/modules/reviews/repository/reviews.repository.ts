@@ -309,6 +309,68 @@ export class ReviewsRepository {
     return !!deleted;
   }
 
+  /**
+   * Update an existing review's editable fields. Undefined values are left
+   * untouched; null values clear the field. Returns the refreshed row (with
+   * company + nickname joins) or null when the review no longer exists.
+   */
+  async updateWithClient(
+    client: DbClient,
+    id: number,
+    input: Partial<{
+      title: string;
+      pros: string | null;
+      cons: string | null;
+      overallRating: number | null;
+      workLifeBalance: number | null;
+      culture: number | null;
+      management: number | null;
+      compensation: number | null;
+      opportunities: number | null;
+      isCurrentEmployee: boolean | null;
+      employmentStatus: string | null;
+      jobTitle: string | null;
+      status: 'published' | 'pending' | 'rejected';
+      contentFingerprint: string;
+    }>,
+  ): Promise<ReviewRow | null> {
+    const fields = Object.fromEntries(
+      Object.entries(input).filter(([, value]) => value !== undefined),
+    );
+
+    const [updated] = await client
+      .update(reviews)
+      .set({ ...fields, updatedAt: new Date() })
+      .where(eq(reviews.id, id))
+      .returning({ id: reviews.id, publicId: reviews.publicId });
+
+    if (!updated) return null;
+    return this.findByIdWithClient(client, updated.id);
+  }
+
+  /** Replace a review's tag links wholesale (delete old, insert new). */
+  async replaceTagsWithClient(
+    client: DbClient,
+    reviewId: number,
+    tagIds: number[],
+  ): Promise<void> {
+    await client.delete(reviewTags).where(eq(reviewTags.reviewId, reviewId));
+    if (tagIds.length > 0) {
+      await client
+        .insert(reviewTags)
+        .values(tagIds.map((tagId) => ({ reviewId, tagId })));
+    }
+  }
+
+  /** The tag ids attached to a review. */
+  async findTagsByReviewId(reviewId: number): Promise<number[]> {
+    const rows = await db
+      .select({ tagId: reviewTags.tagId })
+      .from(reviewTags)
+      .where(eq(reviewTags.reviewId, reviewId));
+    return rows.map((r) => r.tagId);
+  }
+
   async updateCounts(
     id: number,
     counts: { helpfulCount: number; unhelpfulCount: number },

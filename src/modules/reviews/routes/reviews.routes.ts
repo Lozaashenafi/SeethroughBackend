@@ -7,7 +7,13 @@ import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.j
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
 import { RATE_LIMITS } from '../../../shared/constants/index.js';
-import { createReviewSchema, listReviewsQuerySchema, reviewPublicIdParamsSchema, moderateReviewSchema } from '../validation/reviews.validation.js';
+import {
+  createReviewSchema,
+  updateReviewSchema,
+  listReviewsQuerySchema,
+  reviewPublicIdParamsSchema,
+  moderateReviewSchema,
+} from '../validation/reviews.validation.js';
 
 const reviewsRoutes = Router();
 
@@ -26,6 +32,25 @@ reviewsRoutes.get(
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ params: reviewPublicIdParamsSchema }),
   asyncHandler(reviewsController.getByPublicId.bind(reviewsController)),
+);
+
+// Tag ids for a review (used to prefill the edit form).
+reviewsRoutes.get(
+  '/:publicId/tags',
+  anonymousIdentity(),
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ params: reviewPublicIdParamsSchema }),
+  asyncHandler(reviewsController.getTags.bind(reviewsController)),
+);
+
+// Edit your own review. Ownership is checked in the service (404 for others).
+reviewsRoutes.put(
+  '/:publicId',
+  anonymousIdentity(),
+  temporarilyBlockedGuard(),
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ params: reviewPublicIdParamsSchema, body: updateReviewSchema }),
+  asyncHandler(reviewsController.update.bind(reviewsController)),
 );
 
 reviewsRoutes.post(

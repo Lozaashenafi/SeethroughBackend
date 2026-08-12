@@ -13,6 +13,7 @@ import {
   createCompanySchema,
   updateCompanySchema,
   scrapeCompanySchema,
+  checkDuplicateQuerySchema,
 } from '../validation/companies.validation.js';
 
 const companiesRoutes = Router();
@@ -35,6 +36,15 @@ companiesRoutes.post(
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ body: scrapeCompanySchema }),
   asyncHandler(companiesController.scrape.bind(companiesController)),
+);
+
+// Duplicate check — must also come BEFORE /:slug
+companiesRoutes.get(
+  '/check',
+  anonymousIdentity(),
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ query: checkDuplicateQuerySchema }),
+  asyncHandler(companiesController.checkDuplicates.bind(companiesController)),
 );
 
 companiesRoutes.get(

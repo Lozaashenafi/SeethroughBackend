@@ -11,6 +11,24 @@ class CompaniesController {
     sendSuccess(res, result, 'Website scraped successfully');
   }
 
+  async checkDuplicates(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { website, name } = req.query as Record<string, string | undefined>;
+
+    const result = await companiesService.checkDuplicates({ website, name });
+
+    sendSuccess(
+      res,
+      {
+        websiteMatches: result.websiteMatches.map(toCompanyResponse),
+        nameMatches: result.nameMatches.map((m) => ({
+          company: toCompanyResponse(m.company),
+          similarity: m.similarity,
+        })),
+      },
+      'Duplicate check completed',
+    );
+  }
+
   async list(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { search, industry, country, city, page, limit } = req.query as Record<string, string | undefined>;
 

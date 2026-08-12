@@ -12,10 +12,22 @@ class ReviewsController {
     sendSuccess(res, toReviewResponse(review), 'Review created', 201);
   }
 
+  async update(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const review = await reviewsService.update(publicId, req.anonymous!.id, req.body);
+    sendSuccess(res, toReviewResponse(review), 'Review updated');
+  }
+
   async getByPublicId(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { publicId } = req.params;
     const review = await reviewsService.getByPublicId(publicId);
     sendSuccess(res, toReviewResponse(review), 'Review retrieved');
+  }
+
+  async getTags(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const tagIds = await reviewsService.getTags(publicId, req.anonymous!.id);
+    sendSuccess(res, { tagIds }, 'Review tags retrieved');
   }
 
   async adminGetByPublicId(req: Request, res: Response, _next: NextFunction): Promise<void> {

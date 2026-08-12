@@ -187,6 +187,48 @@ class AnonymousService {
     return anonymousRepository.clearTempBlock(identity.id);
   }
 
+  /**
+   * The current identity's own reviews (any moderation status), newest first.
+   * Unlike the public review feed this includes pending/rejected content so
+   * the author can see what happened to their submission and edit it.
+   */
+  async getOwnReviews(
+    publicId: string,
+    params: { page: number; limit: number },
+  ): Promise<{ reviews: ReviewResponse[]; pagination: ActivityPagination }> {
+    const identity = await anonymousRepository.findByPublicId(publicId);
+    if (!identity) {
+      throw new AppError('Anonymous identity not found', 404);
+    }
+    const { data, total } = await reviewsRepository.findByAnonymousId(identity.id, params);
+    return {
+      reviews: data.map(toReviewResponse),
+      pagination: {
+        page: params.page,
+        limit: params.limit,
+        total,
+        totalPages: Math.ceil(total / params.limit),
+      },
+    };
+  }
+
+  /**
+   * One of the caller's own reviews by publicId (any moderation status),
+   * resolved against the caller's identity so it can never fetch another
+   * identity's content. Returns null when not found / not owned — the
+   * controller turns that into a 404.
+   */
+  async getOwnReview(
+    publicId: string,
+    callerPublicId: string,
+  ): Promise<ReviewResponse | null> {
+    const identity = await anonymousRepository.findByPublicId(callerPublicId);
+    if (!identity) return null;
+    const review = await reviewsRepository.findByPublicId(publicId);
+    if (!review || review.anonymousId !== identity.id) return null;
+    return toReviewResponse(review);
+  }
+
   /** Every review authored by an identity across all time (admin-only). */
   async getAllReviews(publicId: string): Promise<ReviewResponse[]> {
     const identity = await anonymousRepository.findByPublicId(publicId);

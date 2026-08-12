@@ -12,6 +12,7 @@ import {
   tempBlockSchema,
   updateNicknameSchema,
 } from '../validation/anonymous.validation.js';
+import { reviewPublicIdParamsSchema } from '../../reviews/validation/reviews.validation.js';
 
 const anonymousRoutes = Router();
 
@@ -29,6 +30,23 @@ anonymousRoutes.patch(
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ body: updateNicknameSchema }),
   asyncHandler(anonymousController.updateNickname.bind(anonymousController)),
+);
+
+// The identity's own reviews (any moderation status) — powers the profile page.
+anonymousRoutes.get(
+  '/me/reviews',
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ query: activityQuerySchema }),
+  asyncHandler(anonymousController.getMyReviews.bind(anonymousController)),
+);
+
+// A single own review by publicId (any status) — robust deep link for editing,
+// independent of pagination or how many reviews the identity has written.
+anonymousRoutes.get(
+  '/me/reviews/:publicId',
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ params: reviewPublicIdParamsSchema }),
+  asyncHandler(anonymousController.getMyReview.bind(anonymousController)),
 );
 
 // Admin-only routes

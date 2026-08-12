@@ -302,13 +302,81 @@ class CompanyScraperService {
 
   private resolveUrl(href: string, baseUrl: string): string {
     if (!href || href.startsWith('data:')) return '';
-    if (href.startsWith('http://') || href.startsWith('https://')) return href;
+    if (href.startsWith('https://')) return href;
+    if (href.startsWith('http://')) {
+      // Upgrade to https — the app is served over TLS, so an http logo would
+      // be blocked by the browser as mixed content and appear broken.
+      return `https://${href.slice(7)}`;
+    }
     try {
       const base = new URL(baseUrl);
       return new URL(href, base.origin).href;
     } catch {
       return href;
     }
+  }
+
+  /**
+   * Pick the highest-resolution URL from an HTML `srcset` value
+   * ("logo.png 1x, logo@2x.png 2x" → "logo@2x.png").
+   */
+  private pickBestSrcset(srcset: string): string | null {
+    const entries = srcset
+      .split(',')
+      .map((part) => {
+        const [urlPart, ...rest] = part.trim().split(/\s+/);
+        if (!urlPart || urlPart.startsWith('data:')) return null;
+        const density = parseFloat((rest[0] || '1x').replace('x', '')) || 1;
+        return { url: urlPart, density };
+      })
+      .filter((e): e is { url: string; density: number } => e !== null);
+
+    if (entries.length === 0) return null;
+    entries.sort((a, b) => b.density - a.density);
+    return entries[0]!.url;
+  }
+
+  /**
+   * Collect every usable image URL from a logo element. Many sites lazy-load
+   * their logo with `data-src`/`data-srcset` (lazysizes and friends) while
+   * leaving `src` as a 1px placeholder — those must be preferred, not skipped.
+   */
+  private collectElementImageSources(el: unknown): string[] {
+    // Every node matched by the logo selectors is an element; read its HTML
+    // attributes directly (cheerio does not re-export the node type publicly).
+    const attribs = (el as { attribs?: Record<string, string> | undefined }).attribs ?? {};
+    const sources: string[] = [];
+    const push = (url: string | undefined | null): void => {
+      if (!url || url.startsWith('data:')) return;
+      if (!sources.includes(url)) sources.push(url);
+    };
+
+    const src = attribs.src;
+    const srcset = attribs.srcset;
+    const dataSrc = attribs['data-src'];
+    const dataSrcset = attribs['data-srcset'];
+    const dataOriginal = attribs['data-original'];
+    const dataLazySrc = attribs['data-lazy-src'];
+
+    // Recognizable 1x1 placeholders that must not win over lazy-load sources.
+    const isPlaceholder = (u: string): boolean =>
+      /(?:pixel|placeholder|spacer|blank|transparent|1x1|preloader)/i.test(u);
+
+    const hasLazySource = !!(dataSrc || dataSrcset || dataOriginal || dataLazySrc);
+
+    if (hasLazySource) {
+      push(dataSrcset ? this.pickBestSrcset(dataSrcset) : null);
+      push(dataSrc);
+      push(dataOriginal);
+      push(dataLazySrc);
+      push(srcset ? this.pickBestSrcset(srcset) : null);
+      if (src && !isPlaceholder(src)) push(src);
+    } else {
+      push(srcset ? this.pickBestSrcset(srcset) : null);
+      push(src);
+    }
+
+    return sources;
   }
 
   private getOrigin(baseUrl: string): string {
@@ -1004,36 +1072,40 @@ class CompanyScraperService {
     orgNode: JsonLdNode | null,
   ): string | null {
     const candidates: string[] = [];
+    const pushCandidate = (url?: string | null): void => {
+      if (url && !url.startsWith('data:') && !candidates.includes(url)) {
+        candidates.push(url);
+      }
+    };
 
     // 1. JSON-LD logo property
     if (orgNode?.logo) {
       if (typeof orgNode.logo === 'string') {
-        candidates.push(orgNode.logo);
+        pushCandidate(orgNode.logo);
       } else if (typeof orgNode.logo === 'object') {
         const logo = orgNode.logo as Record<string, unknown>;
-        const logoUrl = logo.url || logo.contentUrl;
-        if (typeof logoUrl === 'string') candidates.push(logoUrl);
+        pushCandidate(typeof logo.url === 'string' ? logo.url : undefined);
+        pushCandidate(typeof logo.contentUrl === 'string' ? logo.contentUrl : undefined);
       }
     }
 
     // 2. JSON-LD image property as fallback
     if (orgNode?.image && !orgNode.logo) {
       if (typeof orgNode.image === 'string') {
-        candidates.push(orgNode.image);
+        pushCandidate(orgNode.image);
       } else if (typeof orgNode.image === 'object') {
         const img = orgNode.image as Record<string, unknown>;
-        const imgUrl = img.url || img.contentUrl;
-        if (typeof imgUrl === 'string') candidates.push(imgUrl);
+        pushCandidate(typeof img.url === 'string' ? img.url : undefined);
+        pushCandidate(typeof img.contentUrl === 'string' ? img.contentUrl : undefined);
       }
     }
 
-    // 3. Open Graph image
-    const ogImage = $('meta[property="og:image"]').attr('content');
-    if (ogImage) candidates.push(ogImage);
+    // 3. Open Graph image (secure_url is preferred — it is https:// by definition)
+    pushCandidate($('meta[property="og:image:secure_url"]').attr('content'));
+    pushCandidate($('meta[property="og:image"]').attr('content'));
 
     // 4. Twitter image
-    const twitterImage = $('meta[name="twitter:image"]').attr('content');
-    if (twitterImage) candidates.push(twitterImage);
+    pushCandidate($('meta[name="twitter:image"]').attr('content'));
 
     // 5. Logo-specific link tags
     const logoLinks = [
@@ -1045,32 +1117,36 @@ class CompanyScraperService {
     ];
 
     for (const selector of logoLinks) {
-      const href = $(selector).attr('href');
-      if (href) candidates.push(href);
+      pushCandidate($(selector).attr('href'));
     }
 
-    // 6. Look for visible logo images via CSS class/id selectors
+    // 6. Microdata (schema.org) logo references
+    $('link[itemprop="logo"], meta[itemprop="logo"]').each((_, el) => {
+      pushCandidate($(el).attr('href') || $(el).attr('content'));
+    });
+
+    // 7. Look for visible logo images via CSS class/id selectors, including
+    //    lazy-loaded sources (data-src/srcset) and <picture> <source> fallbacks
     const logoSelectors = [
       'img[class*="logo"]',
       'img[id*="logo"]',
       'img[alt*="logo" i]',
+      'img[itemprop="logo"]',
       '.logo img',
       '#logo img',
       '.navbar-brand img',
       '.header-logo img',
       '.site-logo img',
       'a[class*="brand"] img',
+      'picture source',
       'header img:first',
       'nav img:first',
     ];
 
-    const seenSources = new Set<string>();
     for (const selector of logoSelectors) {
       $(selector).each((_, el) => {
-        const src = $(el).attr('src');
-        if (src && !seenSources.has(src)) {
-          seenSources.add(src);
-          candidates.push(src);
+        for (const src of this.collectElementImageSources(el)) {
+          pushCandidate(src);
         }
       });
     }

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../../../shared/responses/index.js';
+import { AppError } from '../../../shared/errors/AppError.js';
 import { anonymousService } from '../service/anonymous.service.js';
 import { toAnonymousResponse } from '../types/anonymous.types.js';
 
@@ -16,6 +17,22 @@ class AnonymousController {
       toAnonymousResponse(identity),
       nickname ? 'Nickname updated' : 'Nickname generated',
     );
+  }
+
+  async getMyReviews(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
+    const result = await anonymousService.getOwnReviews(req.anonymous!.publicId, { page, limit });
+    sendSuccess(res, result, 'My reviews retrieved');
+  }
+
+  async getMyReview(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const review = await anonymousService.getOwnReview(publicId, req.anonymous!.publicId);
+    if (!review) {
+      throw new AppError('Review not found', 404);
+    }
+    sendSuccess(res, review, 'My review retrieved');
   }
 
   async list(req: Request, res: Response, _next: NextFunction): Promise<void> {
