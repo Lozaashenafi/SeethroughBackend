@@ -37,4 +37,26 @@ describe('Reports API', () => {
     // No anonymous cookie → gets 500 from missing identity
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
+
+  it('POST /api/v1/reports - rejects report descriptions containing profanity', async () => {
+    const reviewsRes = await apiCall('get', '/api/v1/reviews', {
+      cookie: anonymousCookie,
+      query: { limit: '1' },
+    });
+    const review = reviewsRes.body.data?.reviews?.[0];
+    if (!review) return;
+
+    const res = await apiCall('post', '/api/v1/reports', {
+      cookie: anonymousCookie,
+      body: {
+        reviewPublicId: review.publicId,
+        reason: 'harassment',
+        description: 'this report is bullshit',
+      },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toMatch(/bullshit/i);
+  });
 });

@@ -7,6 +7,7 @@ import {
   boolean,
   integer,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { anonymousIdentities } from './anonymousIdentity.js';
 import { companies } from './company.js';
@@ -56,5 +57,11 @@ export const reviews = pgTable(
     companyIdx: index('idx_review_company').on(table.companyId),
     createdAtIdx: index('idx_review_created_at').on(table.createdAt),
     ratingIdx: index('idx_review_rating').on(table.overallRating),
+    // One review per identity per company, enforced at the database level so a
+    // concurrent double-submit can never slip past the service check.
+    anonymousCompanyUnique: uniqueIndex('idx_review_anonymous_company_unique').on(
+      table.anonymousId,
+      table.companyId,
+    ),
   }),
 );

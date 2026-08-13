@@ -151,29 +151,6 @@ export class ReviewsRepository {
     return review ?? null;
   }
 
-  /** Most recent review by this identity for the company created within `since`. */
-  async findRecentByAnonymousAndCompany(
-    anonymousId: string,
-    companyId: string,
-    since: Date,
-  ): Promise<ReviewRow | null> {
-    const [review] = await db
-      .select(reviewColumns)
-      .from(reviews)
-      .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
-      .where(
-        and(
-          eq(reviews.anonymousId, anonymousId),
-          eq(reviews.companyId, companyId),
-          sql`${reviews.createdAt} >= ${since}`,
-        ),
-      )
-      .orderBy(desc(reviews.createdAt))
-      .limit(1);
-    return review ?? null;
-  }
-
   /** Recent published reviews for near-duplicate content screening. */
   async findRecentForDupCheck(since: Date, limit: number): Promise<ReviewRow[]> {
     return db

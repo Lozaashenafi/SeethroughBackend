@@ -60,3 +60,4 @@ export {
   textSimilarity,
   NEAR_DUPLICATE_THRESHOLD,
 } from './duplicateDetection.js';
+export { findBadWords, findBadWordsInFields } from './profanityFilter.js';

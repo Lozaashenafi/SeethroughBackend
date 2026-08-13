@@ -1,6 +1,7 @@
 import { commentsRepository } from '../repository/comments.repository.js';
 import { reviewsRepository } from '../../reviews/repository/reviews.repository.js';
 import { AppError } from '../../../shared/errors/AppError.js';
+import { findBadWords } from '../../../shared/utils/index.js';
 
 class CommentsService {
   async create(input: {
@@ -9,6 +10,16 @@ class CommentsService {
     content: string;
     parentPublicId?: string;
   }) {
+    // Profanity gate — block the comment and tell the author exactly which
+    // words to fix before anything is persisted.
+    const badWords = findBadWords(input.content);
+    if (badWords.length > 0) {
+      throw new AppError(
+        `Your comment contains inappropriate language (${badWords.join(', ')}). Please remove or reword it before posting.`,
+        400,
+      );
+    }
+
     // Look up the review
     const review = await reviewsRepository.findByPublicId(input.reviewPublicId);
     if (!review) {

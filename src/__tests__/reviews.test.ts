@@ -74,4 +74,60 @@ describe('Reviews API', () => {
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
+
+  it('POST /api/v1/reviews - rejects reviews containing profanity and lists the words', async () => {
+    const industriesRes = await apiCall('get', '/api/v1/industries', { cookie: anonymousCookie });
+    const industries = industriesRes.body.data ?? [];
+    if (industries.length === 0) return;
+
+    const slug = `profanity-review-${Date.now()}`;
+    const createCompanyRes = await apiCall('post', '/api/v1/companies', {
+      cookie: anonymousCookie,
+      body: {
+        name: `Profanity Review ${Date.now()}`,
+        slug,
+        industryId: industries[0].id,
+        website: `https://profanity-review-${Date.now()}.example.com`,
+      },
+    });
+    expect(createCompanyRes.status).toBe(201);
+
+    const res = await apiCall('post', '/api/v1/reviews', {
+      cookie: anonymousCookie,
+      body: {
+        companySlug: slug,
+        title: 'Terrible management',
+        pros: 'The fucking culture is a bitch',
+        overallRating: 2,
+        employmentStatus: 'full-time',
+      },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toMatch(/fuck/i);
+    expect(res.body.message).toMatch(/bitch/i);
+
+    // A clean review for the same company still goes through
+    const cleanRes = await apiCall('post', '/api/v1/reviews', {
+      cookie: anonymousCookie,
+      body: {
+        companySlug: slug,
+        title: 'Honest experience',
+        pros: 'Good pay and benefits',
+        overallRating: 4,
+        employmentStatus: 'full-time',
+      },
+    });
+    expect(cleanRes.status).toBe(201);
+
+    // Cleanup
+    const loginRes = await apiCall('post', '/api/v1/auth/login', {
+      body: { email: 'admin@seethrough.com', password: 'admin123' },
+      cookie: anonymousCookie,
+    });
+    const adminCookies = loginRes.headers['set-cookie'];
+    const adminCookie = Array.isArray(adminCookies) ? adminCookies.join('; ') : (adminCookies ?? '');
+    await apiCall('delete', `/api/v1/companies/${slug}`, { cookie: adminCookie });
+  });
 });

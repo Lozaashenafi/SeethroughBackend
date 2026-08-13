@@ -133,7 +133,7 @@ describe('Anonymous identity behavior', () => {
     expect(change.body.data.nickname).toBe('Midnight Raven');
   });
 
-  it('rejects a second review for the same company within 30 days', async () => {
+  it('rejects a second review for the same company', async () => {
     const { cookie } = await freshIdentity();
     const companySlug = await createTestCompany(cookie, 'repeat');
 

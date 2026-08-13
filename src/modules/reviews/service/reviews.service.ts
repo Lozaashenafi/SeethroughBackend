@@ -6,11 +6,22 @@ import {
   contentFingerprint,
   textSimilarity,
   NEAR_DUPLICATE_THRESHOLD,
+  findBadWordsInFields,
 } from '../../../shared/utils/index.js';
 import type { CreateReviewInput } from '../types/reviews.types.js';
 
-// One review per company per identity per 30 days.
-const REVIEW_REPEAT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+// Returns a 400 error listing the profane terms found, so the reviewer knows
+// exactly what to fix. Checked on create and edit, before anything is saved.
+function rejectProfanity(fields: Record<string, string | undefined>) {
+  const flagged = findBadWordsInFields(fields);
+  if (flagged.length === 0) return;
+  const words = [...new Set(flagged.flatMap((hit) => hit.words))];
+  throw new AppError(
+    `Your review contains inappropriate language (${words.join(', ')}). Please remove or reword it before posting.`,
+    400,
+  );
+}
+
 // Near-duplicate screening window — how far back we compare content.
 const DUP_SCREEN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 // How many recently-published reviews we compare against for near-duplicates.
@@ -24,16 +35,25 @@ class ReviewsService {
       throw new AppError('Company not found', 404);
     }
 
-    // One review per company per identity per 30 days. The rate limit alone is
-    // not a reliable guard, so enforce the window here too.
-    const recent = await reviewsRepository.findRecentByAnonymousAndCompany(
+    // One review per company per identity, period. The rate limit alone is not
+    // a reliable guard, so enforce it here too — a second review of the same
+    // company is rejected outright (the author can still edit their existing
+    // review via its edit page).
+    const existing = await reviewsRepository.findByAnonymousAndCompany(
       input.anonymousId,
       company.id,
-      new Date(Date.now() - REVIEW_REPEAT_WINDOW_MS),
     );
-    if (recent) {
-      throw new AppError('You have already reviewed this company recently. Please try again later.', 409);
+    if (existing) {
+      throw new AppError('You have already reviewed this company. You can only write one review per company.', 409);
     }
+
+    // Profanity gate — flag before any content is persisted.
+    rejectProfanity({
+      title: input.title,
+      pros: input.pros,
+      cons: input.cons,
+      jobTitle: input.jobTitle,
+    });
 
     // Validate ratings are within range
     const ratings = [
@@ -159,6 +179,14 @@ class ReviewsService {
       employmentStatus: input.employmentStatus ?? review.employmentStatus,
       jobTitle: input.jobTitle ?? review.jobTitle,
     };
+
+    // Profanity gate — re-check the merged content on edit too.
+    rejectProfanity({
+      title: merged.title,
+      pros: merged.pros ?? undefined,
+      cons: merged.cons ?? undefined,
+      jobTitle: merged.jobTitle ?? undefined,
+    });
 
     const fingerprint = contentFingerprint(
       merged.title,

@@ -2,6 +2,7 @@ import { reportsRepository } from '../repository/reports.repository.js';
 import { reviewsRepository } from '../../reviews/repository/reviews.repository.js';
 import { commentsRepository } from '../../comments/repository/comments.repository.js';
 import { AppError } from '../../../shared/errors/AppError.js';
+import { findBadWords } from '../../../shared/utils/index.js';
 import type { ReportStatus } from '../types/reports.types.js';
 
 class ReportsService {
@@ -35,6 +36,15 @@ class ReportsService {
 
     if (!reviewId && !commentId) {
       throw new AppError('Either reviewPublicId or commentPublicId must be provided', 400);
+    }
+
+    // Profanity gate — keep report descriptions civil too.
+    const badWords = findBadWords(input.description ?? '');
+    if (badWords.length > 0) {
+      throw new AppError(
+        `Your report contains inappropriate language (${badWords.join(', ')}). Please remove or reword it before submitting.`,
+        400,
+      );
     }
 
     return reportsRepository.create({

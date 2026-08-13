@@ -37,4 +37,19 @@ describe('Comments API', () => {
     // Will get a 401 or similar since no anonymous identity
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
+
+  it('POST /api/v1/comments - rejects comments containing profanity and lists the words', async () => {
+    const res = await apiCall('post', '/api/v1/comments', {
+      cookie: anonymousCookie,
+      body: {
+        reviewPublicId: 'any-review',
+        content: 'This is a shitty review, fuck this place',
+      },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toMatch(/shit/i);
+    expect(res.body.message).toMatch(/fuck/i);
+  });
 });
