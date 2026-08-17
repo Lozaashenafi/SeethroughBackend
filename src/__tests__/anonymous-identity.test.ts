@@ -15,6 +15,9 @@ async function freshIdentity(): Promise<{ cookie: string; publicId: string }> {
 /** Unique per-run content so leftover rows from earlier runs can never collide. */
 const uniq = (label: string) => `${label} ${Date.now()} ${Math.random().toString(36).slice(2, 8)}`;
 
+/** Unique per-run nickname (≤ 30 chars, passes the nickname charset). */
+const uniqueNickname = (base: string) => `${base} ${Math.random().toString(36).slice(2, 7)}`;
+
 async function createTestCompany(cookie: string, label: string): Promise<string> {
   const industriesRes = await apiCall('get', '/api/v1/industries', { cookie });
   const industries = industriesRes.body.data ?? [];
@@ -76,21 +79,42 @@ describe('Anonymous identity behavior', () => {
 
   it('sets a custom nickname exactly once', async () => {
     const { cookie } = await freshIdentity();
+    const name = uniqueNickname('Brave Falcon');
 
     const setRes = await apiCall('patch', '/api/v1/anonymous/me/nickname', {
       cookie,
-      body: { nickname: 'Brave Falcon' },
+      body: { nickname: name },
     });
     expect(setRes.status).toBe(200);
-    expect(setRes.body.data.nickname).toBe('Brave Falcon');
+    expect(setRes.body.data.nickname).toBe(name);
     expect(setRes.body.data.nicknameRegeneratedAt).toBeDefined();
 
     // The one-time budget is now spent — a second change is rejected.
     const second = await apiCall('patch', '/api/v1/anonymous/me/nickname', {
       cookie,
-      body: { nickname: 'Silent Owl' },
+      body: { nickname: uniqueNickname('Silent Owl') },
     });
     expect(second.status).toBe(409);
+  });
+
+  it('rejects a nickname already taken by another identity', async () => {
+    const first = await freshIdentity();
+    const taken = uniqueNickname('Shared Name');
+
+    const setRes = await apiCall('patch', '/api/v1/anonymous/me/nickname', {
+      cookie: first.cookie,
+      body: { nickname: taken },
+    });
+    expect(setRes.status).toBe(200);
+
+    // A different identity cannot claim the same name (case-insensitively).
+    const second = await freshIdentity();
+    const dupRes = await apiCall('patch', '/api/v1/anonymous/me/nickname', {
+      cookie: second.cookie,
+      body: { nickname: taken.toUpperCase() },
+    });
+    expect(dupRes.status).toBe(409);
+    expect(dupRes.body.success).toBe(false);
   });
 
   it('rejects invalid or oversized custom nicknames', async () => {
@@ -127,10 +151,10 @@ describe('Anonymous identity behavior', () => {
     // Budget still available — a real change works afterwards.
     const change = await apiCall('patch', '/api/v1/anonymous/me/nickname', {
       cookie,
-      body: { nickname: 'Midnight Raven' },
+      body: { nickname: uniqueNickname('Midnight Raven') },
     });
     expect(change.status).toBe(200);
-    expect(change.body.data.nickname).toBe('Midnight Raven');
+    expect(change.body.data.nickname).toContain('Midnight Raven');
   });
 
   it('rejects a second review for the same company', async () => {

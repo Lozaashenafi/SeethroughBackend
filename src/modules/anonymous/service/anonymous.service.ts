@@ -1,4 +1,5 @@
 import { nanoid } from 'nanoid';
+import { randomInt } from 'node:crypto';
 import { db } from '../../../database/db.js';
 import { anonymousRepository } from '../repository/anonymous.repository.js';
 import { reviewsRepository } from '../../reviews/repository/reviews.repository.js';
@@ -23,6 +24,11 @@ import {
   toReportActivityItem,
 } from '../types/anonymous.types.js';
 
+// How many random adjective+animal combinations to try before falling back to
+// a numeric suffix. With ~1,200 combos, a collision after this many tries is
+// essentially impossible.
+const NICKNAME_UNIQUE_ATTEMPTS = 20;
+
 const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000;
 const LAST_SEEN_CACHE_MAX_ENTRIES = 10_000;
 const LAST_SEEN_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -45,9 +51,41 @@ function pruneLastSeenCache(now: number): void {
 }
 
 class AnonymousService {
+  /**
+   * Generates a nickname that is not already in use by another identity.
+   * Nicknames are unique platform-wide; a fresh random combo is drawn until a
+   * free one is found, with a numeric-suffix fallback.
+   */
+  private async generateUniqueNickname(): Promise<string> {
+    for (let attempt = 0; attempt < NICKNAME_UNIQUE_ATTEMPTS; attempt += 1) {
+      const candidate = generateNickname();
+      const existing = await anonymousRepository.findByNickname(candidate);
+      if (!existing) return candidate;
+    }
+
+    let candidate = '';
+    do {
+      candidate = `${generateNickname()} ${randomInt(10, 999)}`;
+    } while (await anonymousRepository.findByNickname(candidate));
+    return candidate;
+  }
+
   async create(): Promise<CreateAnonymousResult> {
     const publicId = nanoid(ANONYMOUS_ID_LENGTH);
-    return anonymousRepository.create({ publicId, nickname: generateNickname() });
+    const nickname = await this.generateUniqueNickname();
+    try {
+      return await anonymousRepository.create({ publicId, nickname });
+    } catch (error) {
+      // Race: another minted identity claimed the same nickname between the
+      // availability check and the insert. Retry once with a fresh nickname.
+      if ((error as { code?: string }).code === '23505') {
+        return anonymousRepository.create({
+          publicId,
+          nickname: await this.generateUniqueNickname(),
+        });
+      }
+      throw error;
+    }
   }
 
   async findByPublicId(publicId: string): Promise<AnonymousIdentity | null> {
@@ -130,8 +168,21 @@ class AnonymousService {
       return identity;
     }
 
-    const next = requested || generateNickname();
-    return anonymousRepository.updateNickname(identity.id, next);
+    if (requested) {
+      // Custom nicknames are unique platform-wide — reject names already in
+      // use by another identity with a friendly error.
+      const taken = await anonymousRepository.findByNickname(requested);
+      if (taken && taken.id !== identity.id) {
+        throw new AppError('This nickname is already taken. Please choose another.', 409);
+      }
+      return anonymousRepository.updateNickname(identity.id, requested);
+    }
+
+    // No nickname provided — the server picks a fresh, unused one.
+    return anonymousRepository.updateNickname(
+      identity.id,
+      await this.generateUniqueNickname(),
+    );
   }
 
   /** Backfill a nickname for identities created before nicknames existed. */
@@ -139,7 +190,10 @@ class AnonymousService {
     if (identity.nickname) return identity;
     // Backfill must NOT consume the identity's one-time regeneration right
     // (updateNickname sets nicknameRegeneratedAt), so use the dedicated method.
-    return anonymousRepository.backfillNickname(identity.id, generateNickname());
+    return anonymousRepository.backfillNickname(
+      identity.id,
+      await this.generateUniqueNickname(),
+    );
   }
 
   /**

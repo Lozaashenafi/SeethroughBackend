@@ -7,7 +7,9 @@ import {
   boolean,
   timestamp,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const anonymousIdentities = pgTable(
   "anonymous_identities",
@@ -58,5 +60,11 @@ export const anonymousIdentities = pgTable(
   (table) => ({
     publicIdIdx: index("idx_anonymous_public_id").on(table.publicId),
     statusIdx: index("idx_anonymous_status").on(table.status),
+    // Nicknames are unique platform-wide (case-insensitively, so "Quiet Fox"
+    // and "quiet fox" can never both exist). The unique index is on
+    // lower(nickname); multiple NULL nicknames are still allowed.
+    nicknameUniqueIdx: uniqueIndex("idx_anonymous_nickname_unique").on(
+      sql`lower(${table.nickname})`,
+    ),
   }),
 );

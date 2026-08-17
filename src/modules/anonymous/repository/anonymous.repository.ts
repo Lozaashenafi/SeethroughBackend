@@ -1,4 +1,4 @@
-import { eq, and, count, desc, or, ilike, inArray, type SQL } from 'drizzle-orm';
+import { eq, and, count, desc, or, ilike, inArray, sql, type SQL } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import { db, type DatabaseTx } from '../../../database/db.js';
 import { anonymousIdentities } from '../../../database/schema/anonymousIdentity.js';
@@ -47,6 +47,19 @@ export class AnonymousRepository {
       .select()
       .from(anonymousIdentities)
       .where(eq(anonymousIdentities.id, id));
+    return identity ?? null;
+  }
+
+  /**
+   * Case-insensitive exact lookup used to keep nicknames unique. `ilike` is
+   * not used because `_` and `%` are valid nickname characters that would act
+   * as LIKE wildcards; lower() equality is exact.
+   */
+  async findByNickname(nickname: string): Promise<AnonymousRow | null> {
+    const [identity] = await db
+      .select()
+      .from(anonymousIdentities)
+      .where(sql`lower(${anonymousIdentities.nickname}) = ${nickname.toLowerCase()}`);
     return identity ?? null;
   }
 
