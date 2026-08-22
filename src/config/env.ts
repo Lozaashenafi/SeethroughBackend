@@ -1,7 +1,9 @@
 import { z } from 'zod';
-import dotenv from 'dotenv';
 
-dotenv.config();
+if (process.env.NODE_ENV !== 'production') {
+  const { default: dotenv } = await import('dotenv');
+  dotenv.config();
+}
 
 export const DEFAULT_ADMIN_EMAIL = 'admin@seethrough.com';
 export const DEFAULT_ADMIN_PASSWORD = 'admin123';
