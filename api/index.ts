@@ -1,12 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { app } from '../dist/app/app.js';
-import { db, testConnection, closePool } from '../dist/database/db.js';
+import { app } from '../src/app/app.js'; 
+import { db, testConnection } from '../src/database/db.js'; 
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const migrationsFolder = path.join(__dirname, '..', 'dist', 'database', 'migrations');
+
+// Update this path to point to where your migrations actually live in source
+const migrationsFolder = path.join(__dirname, '..', 'src', 'database', 'migrations');
 
 let isReady = false;
 
@@ -27,6 +29,14 @@ async function ensureReady() {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await ensureReady();
+
+  // Vercel strips the "/api" prefix from req.url before invoking the handler,
+  // but Express routes are mounted at "/api/v1/...". Restore the prefix so
+  // route matching works correctly.
+  if (!req.url.startsWith('/api')) {
+    req.url = '/api' + req.url;
+  }
+
   return app(req, res);
 }
 

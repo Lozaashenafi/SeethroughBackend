@@ -17,7 +17,7 @@ const envSchema = z.object({
   // cross-origin login/admin calls will be rejected.
   CORS_ORIGIN: z
     .string()
-    .default('http://localhost:5173,https://seethroughfront.vercel.app'),
+    .default('http://localhost:5173,https://seethroght.vercel.app'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   JWT_SECRET: z.string().optional(),
   ADMIN_EMAIL: z.string().email().default(DEFAULT_ADMIN_EMAIL),
