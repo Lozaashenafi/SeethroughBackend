@@ -28,6 +28,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.5.0",
     "@types/pg": "^8.11.10",
+    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
     "compression": "^1.7.4",
@@ -39,6 +40,7 @@
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
     "nanoid": "^5.0.7",
     "pg": "^8.13.0",
     "pino": "^9.4.0",
@@ -46,6 +48,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/multer": "^2.2.0",
     "@types/supertest": "^6.0.3",
     "@vercel/node": "^6.0.0",
     "drizzle-kit": "^0.31.10",

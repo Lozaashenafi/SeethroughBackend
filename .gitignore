@@ -5,3 +5,5 @@ dist/
 !.env.example
 .env.local
 *.log
+.vercel
+.env*

@@ -1,5 +1,6 @@
 import { companiesRepository, type CompanyRow } from '../repository/companies.repository.js';
 import { AppError } from '../../../shared/errors/AppError.js';
+import { uploadsService } from '../../uploads/service/uploads.service.js';
 import {
   normalizeHostname,
   isSameWebsiteHostname,
@@ -95,6 +96,17 @@ class CompaniesService {
     if (!updated) {
       throw new AppError('Failed to update company', 500);
     }
+
+    // The previous logo blob is no longer referenced once the record points
+    // at a new URL. Best-effort cleanup — never blocks the update.
+    if (
+      input.logoUrl !== undefined &&
+      input.logoUrl !== company.logoUrl &&
+      company.logoUrl
+    ) {
+      await uploadsService.deleteLogoQuietly(company.logoUrl);
+    }
+
     return updated;
   }
 

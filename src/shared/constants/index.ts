@@ -14,5 +14,6 @@ export const RATE_LIMITS = {
   COMMENT_CREATE: { windowMs: 24 * 60 * 60 * 1000, max: 20 },
   REACTION: { windowMs: 24 * 60 * 60 * 1000, max: 50 },
   REPORT: { windowMs: 24 * 60 * 60 * 1000, max: 10 },
+  UPLOAD: { windowMs: 24 * 60 * 60 * 1000, max: 20 },
   DEFAULT: { windowMs: 15 * 60 * 1000, max: 100 },
 } as const;

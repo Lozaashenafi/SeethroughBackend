@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { companiesController } from '../controller/companies.controller.js';
 import { anonymousIdentity } from '../../../middlewares/anonymousIdentity.middleware.js';
 import { adminAuth } from '../../../middlewares/adminAuth.middleware.js';
@@ -7,6 +8,7 @@ import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.j
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
 import { RATE_LIMITS } from '../../../shared/constants/index.js';
+import { MAX_LOGO_SIZE_BYTES } from '../../uploads/service/uploads.service.js';
 import {
   listCompaniesQuerySchema,
   companySlugParamsSchema,
@@ -80,6 +82,20 @@ companiesRoutes.delete(
   adminAuth(),
   validate({ params: companySlugParamsSchema }),
   asyncHandler(companiesController.delete.bind(companiesController)),
+);
+
+// Admin-only: upload a logo file and attach it to the company in one call.
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_LOGO_SIZE_BYTES, files: 1 },
+});
+
+companiesRoutes.put(
+  '/:slug/logo',
+  adminAuth(),
+  validate({ params: companySlugParamsSchema }),
+  logoUpload.single('file'),
+  asyncHandler(companiesController.uploadLogo.bind(companiesController)),
 );
 
 export { companiesRoutes };

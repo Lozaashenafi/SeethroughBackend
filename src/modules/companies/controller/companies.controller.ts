@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../../../shared/responses/index.js';
+import { AppError } from '../../../shared/errors/AppError.js';
 import { companiesService } from '../service/companies.service.js';
 import { companyScraperService } from '../services/company-scraper.service.js';
+import { uploadsService } from '../../uploads/service/uploads.service.js';
 import { toCompanyResponse } from '../types/companies.types.js';
 
 class CompaniesController {
@@ -77,6 +79,22 @@ class CompaniesController {
     const { slug } = req.params;
     await companiesService.delete(slug);
     sendSuccess(res, null, 'Company deleted');
+  }
+
+  /**
+   * Admin shortcut: upload a new logo file and persist its URL on the company
+   * in a single request (the previous blob is cleaned up automatically).
+   */
+  async uploadLogo(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { slug } = req.params;
+    if (!req.file) {
+      throw new AppError('No file provided. Send multipart/form-data with a "file" field.', 400);
+    }
+
+    const { url } = await uploadsService.uploadLogo(req.file);
+    const company = await companiesService.update(slug, { logoUrl: url });
+
+    sendSuccess(res, toCompanyResponse(company), 'Company logo updated');
   }
 }
 
