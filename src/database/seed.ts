@@ -11,7 +11,10 @@ import { anonymousIdentities } from './schema/anonymousIdentity.js';
 import { reviews } from './schema/review.js';
 import { reviewTags } from './schema/reviewTag.js';
 import { logger } from '../config/logger.js';
-import { env } from '../config/env.js';
+
+const SEED_ADMIN_EMAIL = 'admin@seethrough.com';
+const SEED_ADMIN_PASSWORD = 'admin123';
+const SEED_ADMIN_NAME = 'Admin';
 
 /**
  * Helper to generate URL-safe slugs.
@@ -88,14 +91,13 @@ async function seed(): Promise<void> {
   logger.info(`  ✓ ${tagData.length} tags seeded`);
 
   // ─── 3. Admin ───
-  // Credentials come from env (ADMIN_EMAIL / ADMIN_PASSWORD) with safe dev defaults.
-  const passwordHash = await bcrypt.hash(env.ADMIN_PASSWORD, 10);
+  const passwordHash = await bcrypt.hash(SEED_ADMIN_PASSWORD, 10);
   await db.insert(admins).values({
-    email: env.ADMIN_EMAIL,
+    email: SEED_ADMIN_EMAIL,
     passwordHash,
-    name: 'Admin',
+    name: SEED_ADMIN_NAME,
   }).onConflictDoNothing({ target: admins.email });
-  logger.info(`  ✓ Admin user seeded (${env.ADMIN_EMAIL})`);
+  logger.info(`  ✓ Admin user seeded (${SEED_ADMIN_EMAIL})`);
 
   // ─── 4. Sample Global Companies (Required for sample reviews) ───
   const allIndustries = await db.select().from(industries);

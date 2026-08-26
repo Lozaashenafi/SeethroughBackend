@@ -5,9 +5,6 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
 
-export const DEFAULT_ADMIN_EMAIL = 'admin@seethrough.com';
-export const DEFAULT_ADMIN_PASSWORD = 'admin123';
-
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(4000),
@@ -20,8 +17,6 @@ const envSchema = z.object({
     .default('http://localhost:5173,https://seethroght.vercel.app'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   JWT_SECRET: z.string().optional(),
-  ADMIN_EMAIL: z.string().email().default(DEFAULT_ADMIN_EMAIL),
-  ADMIN_PASSWORD: z.string().min(8).max(72).default(DEFAULT_ADMIN_PASSWORD),
 });
 
 function validateEnv() {
@@ -33,14 +28,6 @@ function validateEnv() {
   }
 
   const env = parsed.data;
-
-  // Require a real admin password in production; the default is dev-only
-  if (env.NODE_ENV === 'production' && env.ADMIN_PASSWORD === DEFAULT_ADMIN_PASSWORD) {
-    throw new Error(
-      'ADMIN_PASSWORD is required in production. ' +
-        `Set it to a strong password and never use the default "${DEFAULT_ADMIN_PASSWORD}".`,
-    );
-  }
 
   // Require JWT_SECRET in production, provide a warning fallback in dev/test
   if (!env.JWT_SECRET) {
