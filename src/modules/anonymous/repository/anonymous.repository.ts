@@ -70,6 +70,24 @@ export class AnonymousRepository {
       .where(eq(anonymousIdentities.id, id));
   }
 
+  /**
+   * Generate a fresh session token for an existing identity and store its hash.
+   * Used when the browser presents a stale or mismatched session cookie —
+   * instead of minting a brand-new identity (which floods the DB), we re-issue
+   * a session for the same identity so the user keeps their data.
+   */
+  async reissueSessionToken(id: string): Promise<string> {
+    const rawSessionToken = randomBytes(32).toString('base64url');
+    const sessionTokenHash = createHash('sha256').update(rawSessionToken).digest('hex');
+
+    await db
+      .update(anonymousIdentities)
+      .set({ sessionTokenHash })
+      .where(eq(anonymousIdentities.id, id));
+
+    return rawSessionToken;
+  }
+
   async findAll(params: { page: number; limit: number; status?: string; search?: string }): Promise<{ data: AnonymousRow[]; total: number }> {
     const conditions: SQL[] = [];
 

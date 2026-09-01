@@ -352,7 +352,15 @@ export class ReviewsRepository {
     id: number,
     counts: { helpfulCount: number; unhelpfulCount: number },
   ): Promise<void> {
-    await db
+    return this.updateCountsWithClient(db, id, counts);
+  }
+
+  async updateCountsWithClient(
+    client: DbClient,
+    id: number,
+    counts: { helpfulCount: number; unhelpfulCount: number },
+  ): Promise<void> {
+    await client
       .update(reviews)
       .set({
         helpfulCount: counts.helpfulCount,

@@ -319,16 +319,21 @@ class ReviewsService {
       throw new AppError('Review is already published', 409);
     }
 
-    const updated = await reviewsRepository.updateStatus(review.id, status);
+    // Status update and stats recompute happen in a single transaction so the
+    // denormalized counters can never drift from the actual review set, even if
+    // the process crashes between the two operations.
+    const updated = await db.transaction(async (tx) => {
+      await reviewsRepository.setStatusWithClient(tx, review.id, status);
+
+      const stats = await reviewsRepository.getCompanyReviewStatsWithClient(tx, review.companyId);
+      await companiesRepository.updateStatsWithClient(tx, review.companyId, stats);
+
+      return reviewsRepository.findByPublicIdWithClient(tx, publicId);
+    });
+
     if (!updated) {
       throw new AppError('Failed to update review status', 500);
     }
-
-    // Recompute company stats when a review transitions in/out of the public set.
-    await db.transaction(async (tx) => {
-      const stats = await reviewsRepository.getCompanyReviewStatsWithClient(tx, review.companyId);
-      await companiesRepository.updateStatsWithClient(tx, review.companyId, stats);
-    });
 
     return updated;
   }

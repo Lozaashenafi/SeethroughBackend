@@ -5,10 +5,12 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { corsConfig } from '../config/cors.js';
+import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { router } from '../routes/index.js';
 import { errorHandler } from '../middlewares/error.middleware.js';
 import { notFoundHandler } from '../middlewares/notFound.middleware.js';
+import { csrfProtection } from '../middlewares/csrf.middleware.js';
 
 declare global {
   namespace Express {
@@ -20,10 +22,14 @@ declare global {
 
 const app = express();
 
-// Trust the immediate reverse proxy so req.ip reflects the real client IP.
+// Trust the reverse proxy so req.ip reflects the real client IP.
 // Without this, IP-keyed rate limits (e.g. admin login) would all share the
 // proxy's address when deployed behind a proxy (e.g. Vercel/NGINX).
-app.set('trust proxy', 1);
+// Configurable via TRUST_PROXY env var (default: '1').
+const trustProxyValue = env.TRUST_PROXY === 'loopback'
+  ? 'loopback'
+  : parseInt(env.TRUST_PROXY, 10) || 1;
+app.set('trust proxy', trustProxyValue);
 
 app.use(helmet());
 app.use(compression());
@@ -31,6 +37,7 @@ app.use(cors(corsConfig));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
+app.use(csrfProtection());
 
 app.use((req, _res, next) => {
   req.requestId = nanoid(12);

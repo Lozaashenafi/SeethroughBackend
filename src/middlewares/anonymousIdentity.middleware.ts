@@ -33,24 +33,47 @@ export function anonymousIdentity() {
           const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
 
           if (tokenHash === identity.sessionTokenHash) {
+            // Session token is valid — normal happy path.
             if (identity.isBlocked) {
               logger.warn({ publicId: existingPublicId }, 'Blocked identity attempted access');
               next(new AppError('Your account has been blocked. If you believe this is a mistake, please contact support.', 403));
               return;
             }
 
-            // Backfill a nickname for identities created before nicknames were
-            // introduced, and always carry it on the request identity.
             const enriched = await anonymousService.ensureNickname(identity);
             req.anonymous = enriched;
             await anonymousService.updateLastSeen(enriched.id);
             return next();
           }
 
-          logger.warn({ publicId: existingPublicId }, 'Session token mismatch — treating as new identity');
+          // Session token mismatch — re-issue a fresh session token for the
+          // same identity instead of minting a brand-new one. This prevents an
+          // attacker from flooding the DB by rotating stale cookies, and keeps
+          // the user's identity / data intact.
+          logger.warn({ publicId: existingPublicId }, 'Session token mismatch — reissuing session');
+
+          if (identity.isBlocked) {
+            logger.warn({ publicId: existingPublicId }, 'Blocked identity attempted access (mismatch path)');
+            next(new AppError('Your account has been blocked. If you believe this is a mistake, please contact support.', 403));
+            return;
+          }
+
+          const newSessionToken = await anonymousService.reissueSessionToken(identity.id);
+          const enriched = await anonymousService.ensureNickname(identity);
+          req.anonymous = enriched;
+          await anonymousService.updateLastSeen(enriched.id);
+          res.cookie(ANONYMOUS_SESSION_COOKIE_NAME, newSessionToken, {
+            ...cookieConfig,
+            httpOnly: true,
+          });
+          return next();
         }
+
+        // publicId exists in the cookie but the identity was deleted (e.g. by
+        // an admin). Fall through to mint a fresh identity below.
       }
 
+      // No cookies, or orphaned publicId — mint a brand-new identity.
       const { identity, rawSessionToken } = await anonymousService.create();
       req.anonymous = identity;
       req.isNewAnonymousIdentity = true;

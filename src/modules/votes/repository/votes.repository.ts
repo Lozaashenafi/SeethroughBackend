@@ -1,8 +1,10 @@
 import { eq, and, desc, count, sql } from 'drizzle-orm';
-import { db } from '../../../database/db.js';
+import { db, type DatabaseTx } from '../../../database/db.js';
 import { reviewVotes } from '../../../database/schema/reviewVote.js';
 import { reviews } from '../../../database/schema/review.js';
 import { companies } from '../../../database/schema/company.js';
+
+type DbClient = typeof db | DatabaseTx;
 
 interface VoteRow {
   id: number;
@@ -26,7 +28,15 @@ export class VotesRepository {
     anonymousId: string;
     voteType: 'helpful' | 'unhelpful';
   }): Promise<VoteRow> {
-    const [vote] = await db
+    return this.upsertWithClient(db, input);
+  }
+
+  async upsertWithClient(client: DbClient, input: {
+    reviewId: number;
+    anonymousId: string;
+    voteType: 'helpful' | 'unhelpful';
+  }): Promise<VoteRow> {
+    const [vote] = await client
       .insert(reviewVotes)
       .values({
         reviewId: input.reviewId,
@@ -92,8 +102,11 @@ export class VotesRepository {
   }
 
   async getVoteCounts(reviewId: number): Promise<{ helpful: number; unhelpful: number }> {
-    // Aggregate in SQL so we never pull every vote row into memory.
-    const [result] = await db
+    return this.getVoteCountsWithClient(db, reviewId);
+  }
+
+  async getVoteCountsWithClient(client: DbClient, reviewId: number): Promise<{ helpful: number; unhelpful: number }> {
+    const [result] = await client
       .select({
         helpful: sql<number>`count(*) FILTER (WHERE ${reviewVotes.voteType} = 'helpful')`,
         unhelpful: sql<number>`count(*) FILTER (WHERE ${reviewVotes.voteType} = 'unhelpful')`,

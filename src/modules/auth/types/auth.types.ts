@@ -1,4 +1,5 @@
 export interface AdminJwtPayload {
+  jti: string;
   adminId: number;
   email: string;
   name: string;

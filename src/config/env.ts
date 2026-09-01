@@ -17,6 +17,13 @@ const envSchema = z.object({
     .default('http://localhost:5173,https://seethroght.vercel.app'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   JWT_SECRET: z.string().optional(),
+  // Number of proxies to trust for req.ip (Express trust proxy).
+  // Set to 'loopback' for local dev, or a number matching your proxy chain.
+  TRUST_PROXY: z.string().default('1'),
+  // Max connections per pool instance. For Vercel serverless, keep this low
+  // (each function invocation creates its own pool). Default: 5 in production,
+  // 20 in development.
+  DB_POOL_MAX: z.coerce.number().optional(),
 });
 
 function validateEnv() {

@@ -14,7 +14,9 @@ if (typeof net.setDefaultAutoSelectFamily === 'function') {
 
 export const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
-  max: 20,
+  // For Vercel serverless each function invocation creates its own pool.
+  // Keep this low in production (default 5) to avoid overwhelming the DB.
+  max: env.DB_POOL_MAX ?? (env.NODE_ENV === 'production' ? 5 : 20),
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
 });

@@ -28,6 +28,9 @@ import {
 // a numeric suffix. With ~1,200 combos, a collision after this many tries is
 // essentially impossible.
 const NICKNAME_UNIQUE_ATTEMPTS = 20;
+// Maximum attempts for the numeric-suffix fallback to prevent an infinite loop
+// if the nickname space is somehow exhausted.
+const NICKNAME_FALLBACK_MAX_ATTEMPTS = 100;
 
 const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000;
 const LAST_SEEN_CACHE_MAX_ENTRIES = 10_000;
@@ -64,10 +67,12 @@ class AnonymousService {
     }
 
     let candidate = '';
-    do {
+    for (let attempt = 0; attempt < NICKNAME_FALLBACK_MAX_ATTEMPTS; attempt += 1) {
       candidate = `${generateNickname()} ${randomInt(10, 999)}`;
-    } while (await anonymousRepository.findByNickname(candidate));
-    return candidate;
+      const existing = await anonymousRepository.findByNickname(candidate);
+      if (!existing) return candidate;
+    }
+    throw new AppError('Unable to generate a unique nickname. Please try again.', 500);
   }
 
   async create(): Promise<CreateAnonymousResult> {
@@ -91,6 +96,15 @@ class AnonymousService {
   async findByPublicId(publicId: string): Promise<AnonymousIdentity | null> {
     if (!publicId) return null;
     return anonymousRepository.findByPublicId(publicId);
+  }
+
+  /**
+   * Re-issue a session token for an existing identity. Called when the browser
+   * presents a valid publicId but a stale/mismatched session cookie — instead
+   * of creating a new identity (which wastes DB rows), we refresh the session.
+   */
+  async reissueSessionToken(id: string): Promise<string> {
+    return anonymousRepository.reissueSessionToken(id);
   }
 
   async findById(id: string): Promise<AnonymousIdentity | null> {
