@@ -1,6 +1,9 @@
 import { reviewsRepository } from '../repository/reviews.repository.js';
 import { companiesRepository } from '../../companies/repository/companies.repository.js';
+import { userAuthRepository } from '../../user-auth/repository/userAuth.repository.js';
+import { anonymousIdentities } from '../../../database/schema/anonymousIdentity.js';
 import { db } from '../../../database/db.js';
+import { eq } from 'drizzle-orm';
 import { AppError } from '../../../shared/errors/AppError.js';
 import {
   contentFingerprint,
@@ -28,7 +31,7 @@ const DUP_SCREEN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const DUP_SCREEN_LIMIT = 200;
 
 class ReviewsService {
-  async create(input: CreateReviewInput & { anonymousId: string }) {
+  async create(input: CreateReviewInput & { anonymousId: string; userId?: string | null }) {
     // Verify company exists (lookup by slug)
     const company = await companiesRepository.findBySlug(input.companySlug);
     if (!company) {
@@ -99,8 +102,23 @@ class ReviewsService {
     // Review insert, tag links and company stats update are committed
     // atomically so a failure never leaves a half-created review or stale stats.
     const review = await db.transaction(async (tx) => {
+      // Update the anonymous identity's nickname based on user preference.
+      // If the user wants to show their name, set nickname to their display name.
+      // Otherwise, set it to null so it displays as "Anonymous".
+      if (input.userId) {
+        const userProfile = await userAuthRepository.getProfile(input.userId);
+        if (userProfile) {
+          const nickname = userProfile.showDisplayName ? userProfile.displayName : null;
+          await tx
+            .update(anonymousIdentities)
+            .set({ nickname })
+            .where(eq(anonymousIdentities.id, input.anonymousId));
+        }
+      }
+
       const created = await reviewsRepository.createWithClient(tx, {
         anonymousId: input.anonymousId,
+        userId: input.userId ?? null,
         companyId: company.id,
         companySlug: input.companySlug,
         title: input.title,
@@ -142,9 +160,15 @@ class ReviewsService {
     publicId: string,
     anonymousId: string,
     input: Omit<CreateReviewInput, 'companySlug'>,
+    userId?: string,
   ) {
     const review = await reviewsRepository.findByPublicId(publicId);
-    if (!review || review.anonymousId !== anonymousId) {
+    if (!review) {
+      throw new AppError('Review not found', 404);
+    }
+    // Ownership: either the anonymous identity matches, or the authenticated user owns it
+    const isOwner = review.anonymousId === anonymousId || (userId != null && review.userId === userId);
+    if (!isOwner) {
       throw new AppError('Review not found', 404);
     }
 

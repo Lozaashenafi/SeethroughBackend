@@ -1,0 +1,150 @@
+import { Request, Response, NextFunction } from 'express';
+import { OAuth2Client } from 'google-auth-library';
+import { sendSuccess, sendError } from '../../../shared/responses/index.js';
+import { userAuthService } from '../service/userAuth.service.js';
+import { toUserProfile } from '../types/userAuth.types.js';
+import { env } from '../../../config/env.js';
+
+const USER_TOKEN_COOKIE = 'user_token';
+
+class UserAuthController {
+  async register(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { email, password, displayName } = req.body;
+    const result = await userAuthService.register(email, password, displayName);
+
+    res.cookie(USER_TOKEN_COOKIE, result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      path: '/',
+    });
+
+    sendSuccess(res, { user: result.user }, 'Account created successfully', 201);
+  }
+
+  async login(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { email, password } = req.body;
+    const result = await userAuthService.login(email, password);
+
+    res.cookie(USER_TOKEN_COOKIE, result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      path: '/',
+    });
+
+    sendSuccess(res, { user: result.user }, 'Logged in successfully');
+  }
+
+  async googleCallback(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { idToken } = req.body;
+
+    try {
+      let sub: string;
+      let email: string;
+      let name: string;
+      let emailVerified: boolean;
+
+      if (env.GOOGLE_CLIENT_ID) {
+        // Production: cryptographically verify the token with Google
+        const client = new OAuth2Client(env.GOOGLE_CLIENT_ID);
+        const ticket = await client.verifyIdToken({
+          idToken,
+          audience: env.GOOGLE_CLIENT_ID,
+        });
+        const payload = ticket.getPayload();
+        if (!payload || !payload.sub || !payload.email) {
+          sendError(res, 'Invalid Google token', 400);
+          return;
+        }
+        sub = payload.sub;
+        email = payload.email;
+        name = payload.name || payload.email.split('@')[0];
+        emailVerified = payload.email_verified ?? false;
+      } else {
+        // Dev fallback: decode without verification (GOOGLE_CLIENT_ID not set)
+        console.warn('⚠️  GOOGLE_CLIENT_ID not set — decoding Google token without verification. Do NOT use this in production.');
+        const payload = JSON.parse(
+          Buffer.from(idToken.split('.')[1], 'base64url').toString(),
+        );
+        if (!payload.sub || !payload.email) {
+          sendError(res, 'Invalid Google token', 400);
+          return;
+        }
+        sub = payload.sub;
+        email = payload.email;
+        name = payload.name || payload.email.split('@')[0];
+        emailVerified = payload.email_verified ?? false;
+      }
+
+      const result = await userAuthService.googleSignIn({
+        sub,
+        email,
+        name,
+        email_verified: emailVerified,
+      });
+
+      res.cookie(USER_TOKEN_COOKIE, result.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        path: '/',
+      });
+
+      sendSuccess(res, { user: result.user }, 'Signed in with Google');
+    } catch {
+      sendError(res, 'Invalid or expired Google token', 400);
+    }
+  }
+
+  async verifyEmail(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { token } = req.body;
+    await userAuthService.verifyEmail(token);
+    sendSuccess(res, null, 'Email verified successfully');
+  }
+
+  async resendVerification(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    await userAuthService.resendVerificationEmail(req.user!.userId);
+    sendSuccess(res, null, 'Verification email sent');
+  }
+
+  async forgotPassword(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { email } = req.body;
+    await userAuthService.forgotPassword(email);
+    // Always return success to prevent email enumeration
+    sendSuccess(res, null, 'If an account exists with this email, a reset link has been sent');
+  }
+
+  async resetPassword(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { token, password } = req.body;
+    await userAuthService.resetPassword(token, password);
+    sendSuccess(res, null, 'Password reset successfully');
+  }
+
+  async me(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const profile = await userAuthService.getProfile(req.user!.userId);
+    sendSuccess(res, toUserProfile(profile), 'Profile retrieved');
+  }
+
+  async updateShowDisplayName(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { showDisplayName } = req.body;
+    const profile = await userAuthService.updateShowDisplayName(
+      req.user!.userId,
+      showDisplayName,
+    );
+    sendSuccess(res, toUserProfile(profile), 'Display name preference updated');
+  }
+
+  async logout(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    if (req.user) {
+      userAuthService.revokeToken(req.user);
+    }
+    res.clearCookie(USER_TOKEN_COOKIE, { path: '/' });
+    sendSuccess(res, null, 'Logged out successfully');
+  }
+}
+
+export const userAuthController = new UserAuthController();

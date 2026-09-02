@@ -11,6 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { anonymousIdentities } from './anonymousIdentity.js';
 import { companies } from './company.js';
+import { users } from './user.js';
 
 export const reviews = pgTable(
   'reviews',
@@ -20,6 +21,10 @@ export const reviews = pgTable(
     anonymousId: uuid('anonymous_id')
       .notNull()
       .references(() => anonymousIdentities.id),
+    // Linked to the authenticated user who wrote this review. Null for reviews
+    // created before user accounts existed. This column is NEVER exposed in
+    // public API responses — it exists solely for backend ownership checks.
+    userId: uuid('user_id').references(() => users.id),
     companyId: uuid('company_id')
       .notNull()
       .references(() => companies.id),

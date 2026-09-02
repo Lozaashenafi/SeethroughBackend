@@ -9,6 +9,7 @@ import { reportsRoutes } from '../modules/reports/routes/reports.routes.js';
 import { industriesRoutes } from '../modules/industries/routes/industries.routes.js';
 import { tagsRoutes } from '../modules/tags/routes/tags.routes.js';
 import { authRoutes } from '../modules/auth/routes/auth.routes.js';
+import { userAuthRoutes } from '../modules/user-auth/routes/userAuth.routes.js';
 import { uploadsRoutes } from '../modules/uploads/routes/uploads.routes.js';
 import { API_PREFIX } from '../shared/constants/index.js';
 
@@ -24,6 +25,7 @@ router.use(`${API_PREFIX}/reports`, reportsRoutes);
 router.use(`${API_PREFIX}/industries`, industriesRoutes);
 router.use(`${API_PREFIX}/tags`, tagsRoutes);
 router.use(`${API_PREFIX}/auth`, authRoutes);
+router.use(`${API_PREFIX}/user`, userAuthRoutes);
 router.use(`${API_PREFIX}/uploads`, uploadsRoutes);
 
 export { router };

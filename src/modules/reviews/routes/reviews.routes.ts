@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { reviewsController } from '../controller/reviews.controller.js';
 import { anonymousIdentity } from '../../../middlewares/anonymousIdentity.middleware.js';
 import { adminAuth } from '../../../middlewares/adminAuth.middleware.js';
+import { userAuth } from '../../../middlewares/userAuth.middleware.js';
 import { temporarilyBlockedGuard } from '../../../middlewares/temporarilyBlockedGuard.middleware.js';
 import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
@@ -47,15 +48,18 @@ reviewsRoutes.get(
 reviewsRoutes.put(
   '/:publicId',
   anonymousIdentity(),
+  userAuth(),
   temporarilyBlockedGuard(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ params: reviewPublicIdParamsSchema, body: updateReviewSchema }),
   asyncHandler(reviewsController.update.bind(reviewsController)),
 );
 
+// Create a review — requires authenticated user with verified email
 reviewsRoutes.post(
   '/',
   anonymousIdentity(),
+  userAuth({ required: true, verifiedOnly: true }),
   temporarilyBlockedGuard(),
   createRateLimiter(RATE_LIMITS.REVIEW_CREATE),
   validate({ body: createReviewSchema }),

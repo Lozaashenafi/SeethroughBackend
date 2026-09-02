@@ -24,6 +24,16 @@ const envSchema = z.object({
   // (each function invocation creates its own pool). Default: 5 in production,
   // 20 in development.
   DB_POOL_MAX: z.coerce.number().optional(),
+  // Resend API key for transactional emails (verification, password reset).
+  // If not set, emails are logged to console instead of sent.
+  RESEND_API_KEY: z.string().optional(),
+  // Email sender address. Must be from a verified domain in Resend.
+  EMAIL_FROM: z.string().optional(),
+  // Frontend URL for building email links (e.g. verification, password reset).
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
+  // Google OAuth client ID for verifying Google sign-in tokens.
+  // Required for Google authentication to work.
+  GOOGLE_CLIENT_ID: z.string().optional(),
 });
 
 function validateEnv() {

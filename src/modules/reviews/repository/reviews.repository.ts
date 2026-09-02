@@ -14,6 +14,7 @@ type DbClient = typeof db | DatabaseTx;
 
 type CreateReviewRecord = CreateReviewInput & {
   anonymousId: string;
+  userId?: string | null;
   companyId: string;
   status: 'published' | 'pending' | 'rejected';
   contentFingerprint: string;
@@ -23,6 +24,7 @@ const reviewColumns = {
   id: reviews.id,
   publicId: reviews.publicId,
   anonymousId: reviews.anonymousId,
+  userId: reviews.userId,
   nickname: anonymousIdentities.nickname,
   companyId: reviews.companyId,
   companyName: companies.name,
@@ -51,6 +53,7 @@ interface ReviewRow {
   id: number;
   publicId: string;
   anonymousId: string;
+  userId: string | null;
   nickname: string | null;
   companyId: string;
   companyName: string | null;
@@ -88,6 +91,7 @@ export class ReviewsRepository {
       .values({
         publicId,
         anonymousId: input.anonymousId,
+        userId: input.userId ?? null,
         companyId: input.companyId,
         title: input.title,
         pros: input.pros ?? null,

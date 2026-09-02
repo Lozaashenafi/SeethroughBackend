@@ -8,3 +8,4 @@ export * from './review.js';
 export * from './reviewTag.js';
 export * from './reviewVote.js';
 export * from './tag.js';
+export * from './user.js';

@@ -9,16 +9,6 @@ class AnonymousController {
     sendSuccess(res, toAnonymousResponse(req.anonymous!), 'Anonymous identity retrieved');
   }
 
-  async updateNickname(req: Request, res: Response, _next: NextFunction): Promise<void> {
-    const nickname = (req.body as { nickname?: string } | undefined)?.nickname;
-    const identity = await anonymousService.changeNickname(req.anonymous!.publicId, nickname);
-    sendSuccess(
-      res,
-      toAnonymousResponse(identity),
-      nickname ? 'Nickname updated' : 'Nickname generated',
-    );
-  }
-
   async getMyReviews(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;

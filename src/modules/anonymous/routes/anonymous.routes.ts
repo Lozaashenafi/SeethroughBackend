@@ -10,7 +10,6 @@ import {
   listIdentitiesQuerySchema,
   activityQuerySchema,
   tempBlockSchema,
-  updateNicknameSchema,
 } from '../validation/anonymous.validation.js';
 import { reviewPublicIdParamsSchema } from '../../reviews/validation/reviews.validation.js';
 
@@ -23,13 +22,6 @@ anonymousRoutes.get(
   '/me',
   createRateLimiter(RATE_LIMITS.DEFAULT),
   asyncHandler(anonymousController.me.bind(anonymousController)),
-);
-
-anonymousRoutes.patch(
-  '/me/nickname',
-  createRateLimiter(RATE_LIMITS.DEFAULT),
-  validate({ body: updateNicknameSchema }),
-  asyncHandler(anonymousController.updateNickname.bind(anonymousController)),
 );
 
 // The identity's own reviews (any moderation status) — powers the profile page.

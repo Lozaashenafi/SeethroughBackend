@@ -154,51 +154,6 @@ class AnonymousService {
     return anonymousRepository.setBlocked(identity.id, false);
   }
 
-  /**
-   * Set or regenerate the public nickname for an identity. Allowed at most once
-   * per identity — after that the nickname is permanent so a reviewer can't keep
-   * cycling pseudonyms to dodge being recognized by other users.
-   *
-   * - nickname provided  → used verbatim (character/length rules enforced by
-   *   the route validation layer)
-   * - nickname omitted   → the server picks a fresh auto-generated one
-   */
-  async changeNickname(publicId: string, nickname?: string): Promise<AnonymousIdentity> {
-    const identity = await anonymousRepository.findByPublicId(publicId);
-    if (!identity) {
-      throw new AppError('Identity not found', 404);
-    }
-    if (identity.isBlocked) {
-      throw new AppError('Identity is blocked', 403);
-    }
-    if (identity.nicknameRegeneratedAt) {
-      throw new AppError('Nickname can only be changed once', 409);
-    }
-
-    const requested = nickname?.trim();
-    // Saving the exact current name is a no-op and must NOT consume the
-    // one-time change budget.
-    if (requested && requested === identity.nickname) {
-      return identity;
-    }
-
-    if (requested) {
-      // Custom nicknames are unique platform-wide — reject names already in
-      // use by another identity with a friendly error.
-      const taken = await anonymousRepository.findByNickname(requested);
-      if (taken && taken.id !== identity.id) {
-        throw new AppError('This nickname is already taken. Please choose another.', 409);
-      }
-      return anonymousRepository.updateNickname(identity.id, requested);
-    }
-
-    // No nickname provided — the server picks a fresh, unused one.
-    return anonymousRepository.updateNickname(
-      identity.id,
-      await this.generateUniqueNickname(),
-    );
-  }
-
   /** Backfill a nickname for identities created before nicknames existed. */
   async ensureNickname(identity: AnonymousIdentity): Promise<AnonymousIdentity> {
     if (identity.nickname) return identity;

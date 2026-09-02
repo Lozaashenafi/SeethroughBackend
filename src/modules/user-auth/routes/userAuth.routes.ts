@@ -1,0 +1,123 @@
+import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
+import { userAuthController } from '../controller/userAuth.controller.js';
+import { userAuth } from '../../../middlewares/userAuth.middleware.js';
+import { validate } from '../../../middlewares/validate.middleware.js';
+import { asyncHandler } from '../../../shared/utils/index.js';
+import {
+  registerSchema,
+  loginSchema,
+  googleCallbackSchema,
+  verifyEmailSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  updateShowDisplayNameSchema,
+} from '../validation/userAuth.validation.js';
+
+const userAuthRoutes = Router();
+
+// Strict rate limit on registration: 5 attempts per 15 minutes
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: {
+    success: false,
+    message: 'Too many registration attempts. Please try again later.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Strict rate limit on login: 10 attempts per 15 minutes
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: {
+    success: false,
+    message: 'Too many login attempts. Please try again later.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limit on password reset: 3 attempts per 15 minutes
+const resetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  message: {
+    success: false,
+    message: 'Too many reset attempts. Please try again later.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Public routes
+userAuthRoutes.post(
+  '/register',
+  registerLimiter,
+  validate({ body: registerSchema }),
+  asyncHandler(userAuthController.register.bind(userAuthController)),
+);
+
+userAuthRoutes.post(
+  '/login',
+  loginLimiter,
+  validate({ body: loginSchema }),
+  asyncHandler(userAuthController.login.bind(userAuthController)),
+);
+
+userAuthRoutes.post(
+  '/google',
+  validate({ body: googleCallbackSchema }),
+  asyncHandler(userAuthController.googleCallback.bind(userAuthController)),
+);
+
+userAuthRoutes.post(
+  '/verify-email',
+  validate({ body: verifyEmailSchema }),
+  asyncHandler(userAuthController.verifyEmail.bind(userAuthController)),
+);
+
+userAuthRoutes.post(
+  '/forgot-password',
+  resetLimiter,
+  validate({ body: forgotPasswordSchema }),
+  asyncHandler(userAuthController.forgotPassword.bind(userAuthController)),
+);
+
+userAuthRoutes.post(
+  '/reset-password',
+  resetLimiter,
+  validate({ body: resetPasswordSchema }),
+  asyncHandler(userAuthController.resetPassword.bind(userAuthController)),
+);
+
+userAuthRoutes.post(
+  '/resend-verification',
+  registerLimiter,
+  userAuth(),
+  asyncHandler(userAuthController.resendVerification.bind(userAuthController)),
+);
+
+userAuthRoutes.patch(
+  '/show-display-name',
+  userAuth(),
+  validate({ body: updateShowDisplayNameSchema }),
+  asyncHandler(userAuthController.updateShowDisplayName.bind(userAuthController)),
+);
+
+// Protected routes
+userAuthRoutes.get(
+  '/me',
+  userAuth(),
+  asyncHandler(userAuthController.me.bind(userAuthController)),
+);
+
+userAuthRoutes.post(
+  '/logout',
+  userAuth(),
+  asyncHandler(userAuthController.logout.bind(userAuthController)),
+);
+
+export { userAuthRoutes };

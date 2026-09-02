@@ -36,6 +36,20 @@
       "when": 1786976953992,
       "tag": "0004_windy_karma",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788332810705,
+      "tag": "0005_kind_steel_serpent",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788333328507,
+      "tag": "0006_eager_deathstrike",
+      "breakpoints": true
     }
   ]
 }
