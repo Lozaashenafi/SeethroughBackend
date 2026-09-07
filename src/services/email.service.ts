@@ -1,10 +1,12 @@
 import { Resend } from 'resend';
 import { env } from '../config/env.js';
+import { logger } from '../config/logger.js';
 
 let resendClient: Resend | null = null;
 
 function getClient(): Resend | null {
   if (!env.RESEND_API_KEY) {
+    logger.warn('RESEND_API_KEY not set — emails will not be sent');
     return null;
   }
   if (!resendClient) {
@@ -40,7 +42,7 @@ export async function sendVerificationEmail(
   const verificationUrl = `${FRONTEND_URL}/verify-email?token=${token}`;
 
   try {
-    const { error } = await client.emails.send({
+    const result = await client.emails.send({
       from: env.EMAIL_FROM || 'SeeThrough <noreply@seethrough.app>',
       to,
       subject: 'Verify your email — SeeThrough',
@@ -71,14 +73,15 @@ export async function sendVerificationEmail(
       `,
     });
 
-    if (error) {
-      console.error('Failed to send verification email:', error);
-      return { success: false, error: error.message };
+    logger.info({ emailId: result.data?.id, to }, 'Verification email sent');
+    if (result.error) {
+      logger.error({ resendError: result.error, to }, 'Resend rejected verification email');
+      return { success: false, error: result.error.message };
     }
 
     return { success: true };
   } catch (err) {
-    console.error('Failed to send verification email:', err);
+    logger.error({ err, to }, 'Failed to send verification email');
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Unknown error',
@@ -106,7 +109,7 @@ export async function sendPasswordResetEmail(
   const resetUrl = `${FRONTEND_URL}/reset-password?token=${token}`;
 
   try {
-    const { error } = await client.emails.send({
+    const result = await client.emails.send({
       from: env.EMAIL_FROM || 'SeeThrough <noreply@seethrough.app>',
       to,
       subject: 'Reset your password — SeeThrough',
@@ -137,14 +140,15 @@ export async function sendPasswordResetEmail(
       `,
     });
 
-    if (error) {
-      console.error('Failed to send password reset email:', error);
-      return { success: false, error: error.message };
+    logger.info({ emailId: result.data?.id, to }, 'Password reset email sent');
+    if (result.error) {
+      logger.error({ resendError: result.error, to }, 'Resend rejected password reset email');
+      return { success: false, error: result.error.message };
     }
 
     return { success: true };
   } catch (err) {
-    console.error('Failed to send password reset email:', err);
+    logger.error({ err, to }, 'Failed to send password reset email');
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Unknown error',
