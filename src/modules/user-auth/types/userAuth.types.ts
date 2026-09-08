@@ -11,6 +11,7 @@ export interface UserProfile {
   displayName: string;
   emailVerified: boolean;
   showDisplayName: boolean;
+  hasPassword: boolean;
   createdAt: Date;
 }
 
@@ -35,6 +36,7 @@ export function toUserProfile(user: {
   displayName: string;
   emailVerified: boolean;
   showDisplayName: boolean;
+  hasPassword: boolean;
   createdAt: Date;
 }): UserProfile {
   return {
@@ -43,6 +45,7 @@ export function toUserProfile(user: {
     displayName: user.displayName,
     emailVerified: user.emailVerified,
     showDisplayName: user.showDisplayName,
+    hasPassword: user.hasPassword,
     createdAt: user.createdAt,
   };
 }

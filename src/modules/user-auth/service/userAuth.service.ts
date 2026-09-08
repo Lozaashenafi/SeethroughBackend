@@ -92,6 +92,7 @@ class UserAuthService {
         displayName: user.displayName,
         emailVerified: user.emailVerified,
         showDisplayName: user.showDisplayName,
+        hasPassword: true,
         createdAt: user.createdAt,
       },
     };
@@ -125,6 +126,7 @@ class UserAuthService {
           displayName: user.displayName,
           emailVerified: user.emailVerified,
           showDisplayName: user.showDisplayName,
+          hasPassword: !!user.passwordHash,
           createdAt: user.createdAt,
         },
       };
@@ -162,6 +164,7 @@ class UserAuthService {
           displayName: existingByEmail.displayName,
           emailVerified: true,
           showDisplayName: existingByEmail.showDisplayName,
+          hasPassword: !!existingByEmail.passwordHash,
           createdAt: existingByEmail.createdAt,
         },
       };
@@ -318,6 +321,64 @@ class UserAuthService {
   ): Promise<UserProfile> {
     await userAuthRepository.updateShowDisplayName(userId, showDisplayName);
     return this.getProfile(userId);
+  }
+
+  /**
+   * Update the user's display name.
+   */
+  async updateDisplayName(
+    userId: string,
+    displayName: string,
+  ): Promise<UserProfile> {
+    await userAuthRepository.updateDisplayName(userId, displayName);
+    return this.getProfile(userId);
+  }
+
+  /**
+   * Change password for users who have a password (email/password accounts).
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await userAuthRepository.getFullUser(userId);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+    if (!user.passwordHash) {
+      throw new AppError(
+        'Your account uses Google Sign-In. Use "Set Password" to add a password.',
+        400,
+      );
+    }
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new AppError('Current password is incorrect', 401);
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await userAuthRepository.updatePassword(userId, passwordHash);
+  }
+
+  /**
+   * Set a password for Google-only users (who have no password yet).
+   */
+  async setPassword(
+    userId: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await userAuthRepository.getFullUser(userId);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+    if (user.passwordHash) {
+      throw new AppError(
+        'You already have a password. Use "Change Password" instead.',
+        400,
+      );
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await userAuthRepository.updatePassword(userId, passwordHash);
   }
 
   private generateToken(

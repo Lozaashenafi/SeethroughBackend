@@ -49,7 +49,15 @@ export class UserAuthRepository {
         createdAt: users.createdAt,
       });
 
-    return user;
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      emailVerified: user.emailVerified,
+      showDisplayName: user.showDisplayName,
+      hasPassword: !!input.passwordHash,
+      createdAt: user.createdAt,
+    };
   }
 
   async findByEmail(email: string): Promise<UserRow | null> {
@@ -170,11 +178,39 @@ export class UserAuthRepository {
         displayName: users.displayName,
         emailVerified: users.emailVerified,
         showDisplayName: users.showDisplayName,
+        passwordHash: users.passwordHash,
         createdAt: users.createdAt,
       })
       .from(users)
       .where(eq(users.id, id));
+    if (!user) return null;
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      emailVerified: user.emailVerified,
+      showDisplayName: user.showDisplayName,
+      hasPassword: !!user.passwordHash,
+      createdAt: user.createdAt,
+    };
+  }
+
+  async getFullUser(id: string): Promise<UserRow | null> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id));
     return user ?? null;
+  }
+
+  async updateDisplayName(id: string, displayName: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        displayName,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id));
   }
 
   async updateShowDisplayName(

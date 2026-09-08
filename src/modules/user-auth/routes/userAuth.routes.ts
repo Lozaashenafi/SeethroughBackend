@@ -12,6 +12,9 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   updateShowDisplayNameSchema,
+  updateDisplayNameSchema,
+  changePasswordSchema,
+  setPasswordSchema,
 } from '../validation/userAuth.validation.js';
 
 const userAuthRoutes = Router();
@@ -105,6 +108,27 @@ userAuthRoutes.patch(
   userAuth(),
   validate({ body: updateShowDisplayNameSchema }),
   asyncHandler(userAuthController.updateShowDisplayName.bind(userAuthController)),
+);
+
+userAuthRoutes.patch(
+  '/display-name',
+  userAuth(),
+  validate({ body: updateDisplayNameSchema }),
+  asyncHandler(userAuthController.updateDisplayName.bind(userAuthController)),
+);
+
+userAuthRoutes.patch(
+  '/change-password',
+  userAuth(),
+  validate({ body: changePasswordSchema }),
+  asyncHandler(userAuthController.changePassword.bind(userAuthController)),
+);
+
+userAuthRoutes.patch(
+  '/set-password',
+  userAuth(),
+  validate({ body: setPasswordSchema }),
+  asyncHandler(userAuthController.setPassword.bind(userAuthController)),
 );
 
 // Protected routes

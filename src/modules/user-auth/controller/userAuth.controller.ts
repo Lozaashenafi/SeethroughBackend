@@ -138,6 +138,31 @@ class UserAuthController {
     sendSuccess(res, toUserProfile(profile), 'Display name preference updated');
   }
 
+  async updateDisplayName(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { displayName } = req.body;
+    const profile = await userAuthService.updateDisplayName(
+      req.user!.userId,
+      displayName,
+    );
+    sendSuccess(res, toUserProfile(profile), 'Display name updated');
+  }
+
+  async changePassword(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { currentPassword, newPassword } = req.body;
+    await userAuthService.changePassword(
+      req.user!.userId,
+      currentPassword,
+      newPassword,
+    );
+    sendSuccess(res, null, 'Password changed successfully');
+  }
+
+  async setPassword(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { password } = req.body;
+    await userAuthService.setPassword(req.user!.userId, password);
+    sendSuccess(res, null, 'Password set successfully');
+  }
+
   async logout(req: Request, res: Response, _next: NextFunction): Promise<void> {
     if (req.user) {
       userAuthService.revokeToken(req.user);
