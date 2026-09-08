@@ -10,7 +10,7 @@ import { logger } from '../config/logger.js';
 import { router } from '../routes/index.js';
 import { errorHandler } from '../middlewares/error.middleware.js';
 import { notFoundHandler } from '../middlewares/notFound.middleware.js';
-import { csrfProtection } from '../middlewares/csrf.middleware.js';
+// import { csrfProtection } from '../middlewares/csrf.middleware.js';
 
 declare global {
   namespace Express {
