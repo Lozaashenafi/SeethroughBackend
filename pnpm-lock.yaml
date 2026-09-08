@@ -86,6 +86,9 @@ dependencies:
   resend:
     specifier: ^6.25.0
     version: 6.25.0
+  typescript:
+    specifier: ^5.5.4
+    version: 5.9.3
   zod:
     specifier: ^3.23.8
     version: 3.25.76
@@ -115,9 +118,6 @@ devDependencies:
   tsx:
     specifier: ^4.19.0
     version: 4.23.1
-  typescript:
-    specifier: ^5.5.4
-    version: 5.9.3
   typescript-eslint:
     specifier: ^8.65.0
     version: 8.65.0(eslint@9.39.5)(typescript@5.9.3)
@@ -4704,7 +4704,6 @@ packages:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
     hasBin: true
-    dev: true
 
   /undici-types@5.26.5:
     resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
