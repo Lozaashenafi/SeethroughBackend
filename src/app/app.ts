@@ -37,7 +37,7 @@ app.use(cors(corsConfig));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
-app.use(csrfProtection());
+// app.use(csrfProtection());
 
 app.use((req, _res, next) => {
   req.requestId = nanoid(12);
