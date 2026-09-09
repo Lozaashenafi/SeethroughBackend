@@ -226,11 +226,17 @@ class UserAuthService {
       verificationExpiresAt,
     );
 
-    sendVerificationEmail(user.email, verificationToken, user.displayName).catch(
-      (err) => {
-        console.error('Failed to send verification email:', err);
-      },
+    await sendVerificationEmail(
+      user.email,
+      verificationToken,
+      user.displayName,
     );
+
+    // sendVerificationEmail(user.email, verificationToken, user.displayName).catch(
+    //   (err) => {
+    //     console.error('Failed to send verification email:', err);
+    //   },
+    // );
   }
 
   /**
