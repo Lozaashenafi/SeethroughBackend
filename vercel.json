@@ -1,7 +1,7 @@
 {
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
-  "installCommand": "pnpm install",
+  "installCommand": "pnpm install --prod=false",
   "framework": null,
   "functions": {
     "api/index.ts": {
