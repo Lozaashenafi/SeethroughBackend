@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc && rm -rf dist/database/migrations && cp -r src/database/migrations dist/database/migrations",
+    "build": "tsc",
     "start": "node dist/server.js",
     "lint": "eslint src/",
     "format": "prettier --write \"src/**/*.ts\"",
@@ -60,6 +60,7 @@
     "tsx": "^4.19.0",
     "typescript": "^5.5.4",
     "typescript-eslint": "^8.65.0",
-    "vitest": "^3.1.1"
+    "vitest": "^3.1.1",
+    "zod": "^3.23.8"
   }
 }
