@@ -9,8 +9,7 @@ import { sendVerificationEmail, sendPasswordResetEmail } from '../../../services
 import type { UserJwtPayload, UserProfile } from '../types/userAuth.types.js';
 
 // Dummy hash for timing-safe comparison when email is unknown.
-const DUMMY_PASSWORD_HASH =
-  '$2b$10$QNTaq1ejo3M.YILwyMnAt.1V/DahPFee4NgPIOSZTOaUuW7vZLyyK';
+const DUMMY_PASSWORD_HASH = '$2b$10$QNTaq1ejo3M.YILwyMnAt.1V/DahPFee4NgPIOSZTOaUuW7vZLyyK';
 
 const USER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -36,9 +35,7 @@ class UserAuthService {
 
     // Generate email verification token
     const verificationToken = randomBytes(32).toString('hex');
-    const verificationExpiresAt = new Date(
-      Date.now() + VERIFICATION_TOKEN_TTL_MS,
-    );
+    const verificationExpiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
 
     const user = await userAuthRepository.create({
       email,
@@ -61,10 +58,7 @@ class UserAuthService {
   /**
    * Login with email and password.
    */
-  async login(
-    email: string,
-    password: string,
-  ): Promise<{ token: string; user: UserProfile }> {
+  async login(email: string, password: string): Promise<{ token: string; user: UserProfile }> {
     const user = await userAuthRepository.findByEmail(email);
 
     // Always compare to prevent timing-based user enumeration
@@ -76,10 +70,7 @@ class UserAuthService {
     }
 
     if (!user.passwordHash) {
-      throw new AppError(
-        'This account uses Google Sign-In. Please log in with Google.',
-        400,
-      );
+      throw new AppError('This account uses Google Sign-In. Please log in with Google.', 400);
     }
 
     const token = this.generateToken(user.id, user.email, user.displayName);
@@ -113,11 +104,7 @@ class UserAuthService {
 
     if (user) {
       // Existing Google user — log them in
-      const token = this.generateToken(
-        user.id,
-        user.email,
-        user.displayName,
-      );
+      const token = this.generateToken(user.id, user.email, user.displayName);
       return {
         token,
         user: {
@@ -133,18 +120,13 @@ class UserAuthService {
     }
 
     // Check if an account with this email already exists (e.g. email/password signup)
-    const existingByEmail = await userAuthRepository.findByEmail(
-      googleUser.email,
-    );
+    const existingByEmail = await userAuthRepository.findByEmail(googleUser.email);
 
     if (existingByEmail) {
       // Link Google ID to the existing email/password account.
       // The user proved ownership via Google, so we trust the linkage.
       if (!existingByEmail.googleId) {
-        await userAuthRepository.linkGoogleAccount(
-          existingByEmail.id,
-          googleUser.sub,
-        );
+        await userAuthRepository.linkGoogleAccount(existingByEmail.id, googleUser.sub);
       }
       // Also ensure email is marked as verified if Google says it is
       if (googleUser.email_verified && !existingByEmail.emailVerified) {
@@ -178,11 +160,7 @@ class UserAuthService {
       emailVerified: googleUser.email_verified,
     });
 
-    const token = this.generateToken(
-      newUser.id,
-      newUser.email,
-      newUser.displayName,
-    );
+    const token = this.generateToken(newUser.id, newUser.email, newUser.displayName);
 
     return { token, user: newUser };
   }
@@ -193,10 +171,7 @@ class UserAuthService {
   async verifyEmail(token: string): Promise<void> {
     const user = await userAuthRepository.findByVerificationToken(token);
     if (!user) {
-      throw new AppError(
-        'Invalid or expired verification token',
-        400,
-      );
+      throw new AppError('Invalid or expired verification token', 400);
     }
     await userAuthRepository.verifyEmail(user.id);
   }
@@ -204,10 +179,14 @@ class UserAuthService {
   /**
    * Resend a verification email. Generates a new token.
    */
-  async resendVerificationEmail(
-    userId: string,
-  ): Promise<void> {
+  async resendVerificationEmail(userId: string): Promise<void> {
+    console.log('[VERIFY] Starting resend', { userId });
     const user = await userAuthRepository.getProfile(userId);
+    console.log('[VERIFY] User lookup completed', {
+      found: !!user,
+      email: user?.email,
+    });
+
     if (!user) {
       throw new AppError('User not found', 404);
     }
@@ -216,21 +195,17 @@ class UserAuthService {
     }
 
     const verificationToken = randomBytes(32).toString('hex');
-    const verificationExpiresAt = new Date(
-      Date.now() + VERIFICATION_TOKEN_TTL_MS,
-    );
+    const verificationExpiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
+    console.log('[VERIFY] Token generated');
 
-    await userAuthRepository.setVerificationToken(
-      userId,
-      verificationToken,
-      verificationExpiresAt,
-    );
+    await userAuthRepository.setVerificationToken(userId, verificationToken, verificationExpiresAt);
 
-    await sendVerificationEmail(
-      user.email,
-      verificationToken,
-      user.displayName,
-    );
+    console.log('[VERIFY] Verification token saved to DB');
+
+    console.log('[VERIFY] Sending email...');
+
+    await sendVerificationEmail(user.email, verificationToken, user.displayName);
+    console.log('[VERIFY] Email send completed successfully');
 
     // sendVerificationEmail(user.email, verificationToken, user.displayName).catch(
     //   (err) => {
@@ -252,11 +227,7 @@ class UserAuthService {
     const resetToken = randomBytes(32).toString('hex');
     const resetExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
 
-    await userAuthRepository.setResetToken(
-      user.id,
-      resetToken,
-      resetExpiresAt,
-    );
+    await userAuthRepository.setResetToken(user.id, resetToken, resetExpiresAt);
 
     // Send reset email (non-blocking — don't fail if email fails)
     sendPasswordResetEmail(email, resetToken, 'SeeThrough User').catch((err) => {
@@ -267,10 +238,7 @@ class UserAuthService {
   /**
    * Reset password with the reset token.
    */
-  async resetPassword(
-    token: string,
-    newPassword: string,
-  ): Promise<void> {
+  async resetPassword(token: string, newPassword: string): Promise<void> {
     const user = await userAuthRepository.findByResetToken(token);
     if (!user) {
       throw new AppError('Invalid or expired reset token', 400);
@@ -302,8 +270,7 @@ class UserAuthService {
    * Revoke a token (logout).
    */
   revokeToken(payload: UserJwtPayload): void {
-    const expiresAtMs =
-      Date.now() + USER_SESSION_TTL_MS;
+    const expiresAtMs = Date.now() + USER_SESSION_TTL_MS;
     tokenBlocklist.revoke(payload.jti, expiresAtMs);
   }
 
@@ -321,10 +288,7 @@ class UserAuthService {
   /**
    * Toggle whether the user's display name is shown on their reviews.
    */
-  async updateShowDisplayName(
-    userId: string,
-    showDisplayName: boolean,
-  ): Promise<UserProfile> {
+  async updateShowDisplayName(userId: string, showDisplayName: boolean): Promise<UserProfile> {
     await userAuthRepository.updateShowDisplayName(userId, showDisplayName);
     return this.getProfile(userId);
   }
@@ -332,10 +296,7 @@ class UserAuthService {
   /**
    * Update the user's display name.
    */
-  async updateDisplayName(
-    userId: string,
-    displayName: string,
-  ): Promise<UserProfile> {
+  async updateDisplayName(userId: string, displayName: string): Promise<UserProfile> {
     await userAuthRepository.updateDisplayName(userId, displayName);
     return this.getProfile(userId);
   }
@@ -369,29 +330,19 @@ class UserAuthService {
   /**
    * Set a password for Google-only users (who have no password yet).
    */
-  async setPassword(
-    userId: string,
-    newPassword: string,
-  ): Promise<void> {
+  async setPassword(userId: string, newPassword: string): Promise<void> {
     const user = await userAuthRepository.getFullUser(userId);
     if (!user) {
       throw new AppError('User not found', 404);
     }
     if (user.passwordHash) {
-      throw new AppError(
-        'You already have a password. Use "Change Password" instead.',
-        400,
-      );
+      throw new AppError('You already have a password. Use "Change Password" instead.', 400);
     }
     const passwordHash = await bcrypt.hash(newPassword, 12);
     await userAuthRepository.updatePassword(userId, passwordHash);
   }
 
-  private generateToken(
-    userId: string,
-    email: string,
-    displayName: string,
-  ): string {
+  private generateToken(userId: string, email: string, displayName: string): string {
     const jti = randomBytes(16).toString('hex');
     const payload: UserJwtPayload = {
       jti,

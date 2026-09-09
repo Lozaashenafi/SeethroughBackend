@@ -30,18 +30,38 @@ export async function sendVerificationEmail(
   token: string,
   displayName: string,
 ): Promise<EmailResult> {
+  logger.info(
+    {
+      resendConfigured: !!env.RESEND_API_KEY,
+      emailFrom: env.EMAIL_FROM,
+      frontendUrl: FRONTEND_URL,
+    },
+    'Verification email configuration',
+  );
   const client = getClient();
   if (!client) {
-    console.warn(
-      '⚠️  RESEND_API_KEY not set — skipping verification email. Token:',
-      token,
-    );
-    return { success: true }; // Don't block registration in dev
+    logger.error('RESEND_API_KEY is not configured');
+    throw new Error('Email service is not configured');
   }
+  // if (!client) {
+  //   console.warn(
+  //     '⚠️  RESEND_API_KEY not set — skipping verification email. Token:',
+  //     token,
+  //   );
+  //   return { success: true }; // Don't block registration in dev
+  // }
 
   const verificationUrl = `${FRONTEND_URL}/verify-email?token=${token}`;
 
   try {
+    logger.info(
+      {
+        to,
+        from: env.EMAIL_FROM,
+        frontendUrl: FRONTEND_URL,
+      },
+      'Attempting to send verification email',
+    );
     const result = await client.emails.send({
       from: env.EMAIL_FROM || 'SeeThrough <noreply@seethrough.app>',
       to,
@@ -72,21 +92,37 @@ export async function sendVerificationEmail(
         </html>
       `,
     });
+    if (result.error) {
+      logger.error(
+        {
+          resendError: result.error,
+          to,
+        },
+        'Resend rejected verification email',
+      );
+
+      throw new Error(result.error.message);
+    }
 
     logger.info({ emailId: result.data?.id, to }, 'Verification email sent');
-    if (result.error) {
-      logger.error({ resendError: result.error, to }, 'Resend rejected verification email');
-      return { success: false, error: result.error.message };
-    }
 
     return { success: true };
   } catch (err) {
-    logger.error({ err, to }, 'Failed to send verification email');
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : 'Unknown error',
-    };
+    logger.error(
+      {
+        err,
+        to,
+      },
+      'Failed to send verification email',
+    );
+
+    throw err;
   }
+  // logger.error({ err, to }, 'Failed to send verification email');
+  // return {
+  //   success: false,
+  //   error: err instanceof Error ? err.message : 'Unknown error',
+  // };
 }
 
 /**
@@ -99,10 +135,7 @@ export async function sendPasswordResetEmail(
 ): Promise<EmailResult> {
   const client = getClient();
   if (!client) {
-    console.warn(
-      '⚠️  RESEND_API_KEY not set — skipping password reset email. Token:',
-      token,
-    );
+    console.warn('⚠️  RESEND_API_KEY not set — skipping password reset email. Token:', token);
     return { success: true };
   }
 
