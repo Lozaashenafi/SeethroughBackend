@@ -1,4 +1,4 @@
-import { put, del } from '@vercel/blob';
+import { put, del, head } from '@vercel/blob';
 import { randomBytes } from 'node:crypto';
 import { AppError } from '../../../shared/errors/AppError.js';
 
@@ -45,7 +45,7 @@ class UploadsService {
     const pathname = `logos/${Date.now()}-${randomBytes(8).toString('hex')}.${extension}`;
 
     const blob = await put(pathname, file.buffer, {
-      access: 'public',
+      access: 'private',
       contentType: file.mimetype,
       addRandomSuffix: false,
     });
@@ -58,12 +58,51 @@ class UploadsService {
    * blob that fails to delete must not block updating the company record.
    */
   async deleteLogoQuietly(url: string | null | undefined): Promise<void> {
-    if (!url || !url.includes('blob.vercel-storage.com')) return;
+    if (!url) return;
+    // Accept both raw pathnames and full blob URLs.
+    const pathname = url.includes('blob.vercel-storage.com')
+      ? url.split('blob.vercel-storage.com/')[1]
+      : url;
+    if (!pathname) return;
     try {
-      await del(url);
+      await del(pathname);
     } catch {
       // Ignore — orphaned blobs are harmless and can be cleaned up later.
     }
+  }
+
+  /**
+   * Resolve a stored pathname (or legacy full URL) into a fresh signed URL
+   * that the browser can fetch.  Returns null for empty/invalid inputs.
+   */
+  async resolveLogoUrl(logoUrl: string | null): Promise<string | null> {
+    if (!logoUrl) return null;
+
+    // Legacy full URLs stored before the private-store migration — return as-is.
+    if (logoUrl.startsWith('http')) return logoUrl;
+
+    // It's a pathname — fetch fresh metadata from the private store.
+    try {
+      const blob = await head(logoUrl);
+      return blob.url;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Batch-resolve multiple logo pathnames.  Returns a Map of pathname → signed URL.
+   */
+  async resolveLogoUrls(pathnames: (string | null)[]): Promise<Map<string, string>> {
+    const unique = [...new Set(pathnames.filter((p): p is string => !!p && !p.startsWith('http')))];
+    const result = new Map<string, string>();
+    await Promise.all(
+      unique.map(async (pathname) => {
+        const url = await this.resolveLogoUrl(pathname);
+        if (url) result.set(pathname, url);
+      }),
+    );
+    return result;
   }
 }
 

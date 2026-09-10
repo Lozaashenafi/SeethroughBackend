@@ -43,10 +43,12 @@ class CompaniesController {
       limit: Number(limit) || 20,
     });
 
+    const logoUrls = await uploadsService.resolveLogoUrls(result.data.map((c) => c.logoUrl));
+
     sendSuccess(
       res,
       {
-        companies: result.data.map(toCompanyResponse),
+        companies: result.data.map((c) => toCompanyResponse({ ...c, logoUrl: logoUrls.get(c.logoUrl!) ?? c.logoUrl })),
         pagination: {
           total: result.total,
           page: Number(page) || 1,
@@ -61,18 +63,21 @@ class CompaniesController {
   async getBySlug(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { slug } = req.params;
     const company = await companiesService.getBySlug(slug);
-    sendSuccess(res, toCompanyResponse(company), 'Company retrieved');
+    const logoUrl = await uploadsService.resolveLogoUrl(company.logoUrl);
+    sendSuccess(res, toCompanyResponse({ ...company, logoUrl: logoUrl ?? company.logoUrl }), 'Company retrieved');
   }
 
   async create(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const company = await companiesService.create(req.body);
-    sendSuccess(res, toCompanyResponse(company), 'Company created', 201);
+    const logoUrl = await uploadsService.resolveLogoUrl(company.logoUrl);
+    sendSuccess(res, toCompanyResponse({ ...company, logoUrl: logoUrl ?? company.logoUrl }), 'Company created', 201);
   }
 
   async update(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { slug } = req.params;
     const company = await companiesService.update(slug, req.body);
-    sendSuccess(res, toCompanyResponse(company), 'Company updated');
+    const logoUrl = await uploadsService.resolveLogoUrl(company!.logoUrl);
+    sendSuccess(res, toCompanyResponse({ ...company!, logoUrl: logoUrl ?? company!.logoUrl }), 'Company updated');
   }
 
   async delete(req: Request, res: Response, _next: NextFunction): Promise<void> {
@@ -91,10 +96,11 @@ class CompaniesController {
       throw new AppError('No file provided. Send multipart/form-data with a "file" field.', 400);
     }
 
-    const { url } = await uploadsService.uploadLogo(req.file);
-    const company = await companiesService.update(slug, { logoUrl: url });
+    const { pathname } = await uploadsService.uploadLogo(req.file);
+    const company = await companiesService.update(slug, { logoUrl: pathname });
+    const logoUrl = await uploadsService.resolveLogoUrl(company!.logoUrl);
 
-    sendSuccess(res, toCompanyResponse(company), 'Company logo updated');
+    sendSuccess(res, toCompanyResponse({ ...company!, logoUrl: logoUrl ?? company!.logoUrl }), 'Company logo updated');
   }
 }
 

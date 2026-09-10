@@ -43,9 +43,15 @@ export function csrfProtection() {
       return next();
     }
 
-    // Skip CSRF for login — it's protected by rate limiting and timing-safe
-    // comparison; the user has no cookie to echo yet on first visit.
-    if (req.path === '/auth/login') {
+    // Skip CSRF for auth endpoints — the user has no CSRF cookie to echo yet
+    // on first visit. These endpoints are protected by rate limiting instead.
+    // Use endsWith because req.path includes the /api/v1 prefix.
+    const isAuthEndpoint =
+      req.path.endsWith('/auth/login') ||
+      req.path.endsWith('/user/login') ||
+      req.path.endsWith('/user/register') ||
+      req.path.endsWith('/user/google');
+    if (isAuthEndpoint) {
       return next();
     }
 
