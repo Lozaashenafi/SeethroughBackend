@@ -3,14 +3,15 @@ export interface UserJwtPayload {
   userId: string;
   email: string;
   displayName: string;
+  role: string;
 }
 
 export interface UserProfile {
   id: string;
   email: string;
   displayName: string;
+  role: string;
   emailVerified: boolean;
-  showDisplayName: boolean;
   hasPassword: boolean;
   createdAt: Date;
 }
@@ -34,8 +35,8 @@ export function toUserProfile(user: {
   id: string;
   email: string;
   displayName: string;
+  role: string;
   emailVerified: boolean;
-  showDisplayName: boolean;
   hasPassword: boolean;
   createdAt: Date;
 }): UserProfile {
@@ -43,8 +44,8 @@ export function toUserProfile(user: {
     id: user.id,
     email: user.email,
     displayName: user.displayName,
+    role: user.role,
     emailVerified: user.emailVerified,
-    showDisplayName: user.showDisplayName,
     hasPassword: user.hasPassword,
     createdAt: user.createdAt,
   };

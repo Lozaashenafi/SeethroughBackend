@@ -10,7 +10,7 @@ import type { ReportStatus } from '../types/reports.types.js';
 interface ReportRow {
   id: number;
   publicId: string;
-  anonymousId: string;
+  userId: string;
   reviewId: number | null;
   commentId: number | null;
   reason: string;
@@ -18,7 +18,6 @@ interface ReportRow {
   status: string;
   createdAt: Date;
   resolvedAt: Date | null;
-  // Joined context for the admin queue — populated by findAll(), null elsewhere.
   reviewPublicId?: string | null;
   reviewTitle?: string | null;
   companyName?: string | null;
@@ -42,7 +41,7 @@ interface ReportActivityRow {
 
 export class ReportsRepository {
   async create(input: {
-    anonymousId: string;
+    userId: string;
     reviewId?: number;
     commentId?: number;
     reason: string;
@@ -54,7 +53,7 @@ export class ReportsRepository {
       .insert(reports)
       .values({
         publicId,
-        anonymousId: input.anonymousId,
+        userId: input.userId,
         reviewId: input.reviewId ?? null,
         commentId: input.commentId ?? null,
         reason: input.reason,
@@ -86,7 +85,7 @@ export class ReportsRepository {
       .select({
         id: reports.id,
         publicId: reports.publicId,
-        anonymousId: reports.anonymousId,
+        userId: reports.userId,
         reviewId: reports.reviewId,
         commentId: reports.commentId,
         reason: reports.reason,
@@ -118,9 +117,9 @@ export class ReportsRepository {
     return { data, total: totalResult?.total ?? 0 };
   }
 
-  /** All reports filed by an identity, newest first, with target review/comment info. */
-  async findByAnonymousId(
-    anonymousId: string,
+  /** All reports filed by a user, newest first, with target review/comment info. */
+  async findByUserId(
+    userId: string,
     params: { page: number; limit: number },
   ): Promise<{ data: ReportActivityRow[]; total: number }> {
     const offset = (params.page - 1) * params.limit;
@@ -141,7 +140,7 @@ export class ReportsRepository {
       .from(reports)
       .leftJoin(reviews, eq(reports.reviewId, reviews.id))
       .leftJoin(comments, eq(reports.commentId, comments.id))
-      .where(eq(reports.anonymousId, anonymousId))
+      .where(eq(reports.userId, userId))
       .orderBy(desc(reports.createdAt))
       .limit(params.limit)
       .offset(offset);
@@ -149,7 +148,7 @@ export class ReportsRepository {
     const [totalResult] = await db
       .select({ total: count() })
       .from(reports)
-      .where(eq(reports.anonymousId, anonymousId));
+      .where(eq(reports.userId, userId));
 
     return { data, total: totalResult?.total ?? 0 };
   }

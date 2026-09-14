@@ -2,6 +2,7 @@ import {
   pgTable,
   uuid,
   varchar,
+  text,
   boolean,
   timestamp,
   index,
@@ -11,34 +12,26 @@ export const users = pgTable(
   'users',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-
     email: varchar('email', { length: 255 }).notNull().unique(),
-
-    // Null when the user signed up via Google (no password).
     passwordHash: varchar('password_hash', { length: 255 }),
-
     displayName: varchar('display_name', { length: 100 }).notNull(),
-
-    // Google OAuth subject ID. Null for email/password-only users.
     googleId: varchar('google_id', { length: 255 }).unique(),
-
-    // Email verification
+    role: text('role', { enum: ['user', 'admin'] }).default('user').notNull(),
     emailVerified: boolean('email_verified').default(false).notNull(),
     verificationToken: varchar('verification_token', { length: 255 }),
     verificationExpiresAt: timestamp('verification_expires_at', {
       withTimezone: true,
     }),
-
-    // Password reset
     resetToken: varchar('reset_token', { length: 255 }),
     resetExpiresAt: timestamp('reset_expires_at', {
       withTimezone: true,
     }),
-
-    // When true, the user's display name is shown on their reviews instead
-    // of "Anonymous". Default is false (anonymous).
-    showDisplayName: boolean('show_display_name').default(false).notNull(),
-
+    // Moderation state, managed from the admin Users tab. A blocked user can
+    // still browse (and log in) but cannot post reviews, comments, votes or
+    // reports; `tempBlockedUntil` is the softer, self-expiring variant.
+    isBlocked: boolean('is_blocked').default(false).notNull(),
+    blockedAt: timestamp('blocked_at', { withTimezone: true }),
+    tempBlockedUntil: timestamp('temp_blocked_until', { withTimezone: true }),
     createdAt: timestamp('created_at', {
       withTimezone: true,
     })

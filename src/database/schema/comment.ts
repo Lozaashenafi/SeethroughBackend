@@ -8,17 +8,17 @@ import {
   index,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { anonymousIdentities } from './anonymousIdentity.js';
 import { reviews } from './review.js';
+import { users } from './user.js';
 
 export const comments = pgTable(
   'comments',
   {
     id: serial('id').primaryKey(),
     publicId: text('public_id').notNull().unique(),
-    anonymousId: uuid('anonymous_id')
+    userId: uuid('user_id')
       .notNull()
-      .references(() => anonymousIdentities.id),
+      .references(() => users.id),
     reviewId: integer('review_id')
       .notNull()
       .references(() => reviews.id),
@@ -30,8 +30,8 @@ export const comments = pgTable(
   },
   (table) => ({
     publicIdIdx: index('idx_comment_public_id').on(table.publicId),
+    userIdx: index('idx_comment_user').on(table.userId),
     reviewIdx: index('idx_comment_review').on(table.reviewId),
-    anonymousIdx: index('idx_comment_anonymous').on(table.anonymousId),
     parentIdx: index('idx_comment_parent').on(table.parentId),
   }),
 );

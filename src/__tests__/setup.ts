@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import bcrypt from 'bcryptjs';
 import { pool, testConnection, closePool } from '../database/db.js';
 import { router } from '../routes/index.js';
 import { errorHandler } from '../middlewares/error.middleware.js';
@@ -15,6 +16,9 @@ let app: Express;
 export function getTestApp(): Express {
   if (!app) {
     app = express();
+    // Mirror app.ts: rate limiters key on req.ip, which is only behind the
+    // proxy when trust proxy is set. Tests use it to run as separate clients.
+    app.set('trust proxy', 1);
     app.use(helmet());
     app.use(compression());
     app.use(cors({ origin: '*' }));
@@ -32,38 +36,31 @@ export function getTestApp(): Express {
   return app;
 }
 
-/**
- * Ensure the admins table exists and seed the default admin user.
- * This is needed for auth tests to work against a fresh database.
- */
-async function ensureAdminTable(): Promise<void> {
-  const client = await pool.connect();
-  try {
-    // Create admins table if it doesn't exist
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS admins (
-        id SERIAL PRIMARY KEY,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
+export const TEST_ADMIN_EMAIL = 'admin@seethrough.com';
+export const TEST_ADMIN_PASSWORD = 'admin123';
 
-    // Seed default admin if not exists
-    await client.query(`
-      INSERT INTO admins (email, password_hash, name)
-      VALUES (
-        'admin@seethrough.com',
-        '$2b$10$gsLxbGPm47Fl4deZYfVqEuXpT8ALi2dNVQVwC1zMuZY7N6Q8w6N2K',
-        'Admin'
-      )
-      ON CONFLICT (email) DO NOTHING;
-    `);
-  } finally {
-    client.release();
-  }
+/**
+ * Ensure the default admin account exists with a known password.
+ *
+ * Admin auth moved from a dedicated `admins` table to `role = 'admin'` on
+ * `users`, so tests seed a user row instead of creating a table. The password
+ * hash is computed here (rather than hardcoded) so it always matches a real
+ * bcrypt hash of TEST_ADMIN_PASSWORD.
+ */
+async function ensureAdminUser(): Promise<void> {
+  const passwordHash = await bcrypt.hash(TEST_ADMIN_PASSWORD, 10);
+
+  await pool.query(
+    `INSERT INTO users (email, password_hash, display_name, role, email_verified)
+     VALUES ($1, $2, 'Admin', 'admin', true)
+     ON CONFLICT (email) DO UPDATE
+       SET password_hash = EXCLUDED.password_hash,
+           role = 'admin',
+           email_verified = true,
+           is_blocked = false,
+           temp_blocked_until = NULL`,
+    [TEST_ADMIN_EMAIL, passwordHash],
+  );
 }
 
 beforeAll(async () => {
@@ -75,8 +72,9 @@ beforeAll(async () => {
     );
   }
 
-  // Ensure the admins table is ready for auth tests
-  await ensureAdminTable();
+  // The schema must already be migrated (`pnpm db:migrate`); tests never run
+  // migrations so a missing table surfaces as a clear failure here.
+  await ensureAdminUser();
 });
 
 afterAll(async () => {

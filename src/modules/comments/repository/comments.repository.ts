@@ -19,11 +19,9 @@ interface CommentActivityRow {
 interface CommentRow {
   id: number;
   publicId: string;
-  anonymousId: string;
+  userId: string;
   reviewId: number;
   parentId: number | null;
-  // Public identifier of the parent comment. Only present when a parent was
-  // joined (list) or supplied at creation time — never leaks the internal id.
   parentPublicId?: string | null;
   content: string;
   helpfulCount: number;
@@ -33,7 +31,7 @@ interface CommentRow {
 
 export class CommentsRepository {
   async create(input: {
-    anonymousId: string;
+    userId: string;
     reviewId: number;
     content: string;
     parentId?: number;
@@ -45,7 +43,7 @@ export class CommentsRepository {
       .insert(comments)
       .values({
         publicId,
-        anonymousId: input.anonymousId,
+        userId: input.userId,
         reviewId: input.reviewId,
         content: input.content,
         parentId: input.parentId ?? null,
@@ -72,7 +70,7 @@ export class CommentsRepository {
       .select({
         id: comments.id,
         publicId: comments.publicId,
-        anonymousId: comments.anonymousId,
+        userId: comments.userId,
         reviewId: comments.reviewId,
         parentId: comments.parentId,
         parentPublicId: parentComments.publicId,
@@ -96,9 +94,9 @@ export class CommentsRepository {
     return { data, total: totalResult?.total ?? 0 };
   }
 
-  /** All comments authored by an identity, newest first, with target review info. */
-  async findByAnonymousId(
-    anonymousId: string,
+  /** All comments authored by a user, newest first, with target review info. */
+  async findByUserId(
+    userId: string,
     params: { page: number; limit: number },
   ): Promise<{ data: CommentActivityRow[]; total: number }> {
     const offset = (params.page - 1) * params.limit;
@@ -116,7 +114,7 @@ export class CommentsRepository {
       .from(comments)
       .leftJoin(reviews, eq(comments.reviewId, reviews.id))
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .where(eq(comments.anonymousId, anonymousId))
+      .where(eq(comments.userId, userId))
       .orderBy(desc(comments.createdAt))
       .limit(params.limit)
       .offset(offset);
@@ -124,7 +122,7 @@ export class CommentsRepository {
     const [totalResult] = await db
       .select({ total: count() })
       .from(comments)
-      .where(eq(comments.anonymousId, anonymousId));
+      .where(eq(comments.userId, userId));
 
     return { data, total: totalResult?.total ?? 0 };
   }

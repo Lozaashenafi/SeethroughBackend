@@ -7,18 +7,18 @@ import {
   integer,
   index,
 } from 'drizzle-orm/pg-core';
-import { anonymousIdentities } from './anonymousIdentity.js';
 import { reviews } from './review.js';
 import { comments } from './comment.js';
+import { users } from './user.js';
 
 export const reports = pgTable(
   'reports',
   {
     id: serial('id').primaryKey(),
     publicId: text('public_id').notNull().unique(),
-    anonymousId: uuid('anonymous_id')
+    userId: uuid('user_id')
       .notNull()
-      .references(() => anonymousIdentities.id),
+      .references(() => users.id),
     reviewId: integer('review_id').references(() => reviews.id),
     commentId: integer('comment_id').references(() => comments.id),
     reason: text('reason').notNull(),
@@ -31,7 +31,7 @@ export const reports = pgTable(
   },
   (table) => ({
     publicIdIdx: index('idx_report_public_id').on(table.publicId),
-    anonymousIdx: index('idx_report_anonymous').on(table.anonymousId),
+    userIdx: index('idx_report_user').on(table.userId),
     reviewIdx: index('idx_report_review').on(table.reviewId),
     commentIdx: index('idx_report_comment').on(table.commentId),
     statusIdx: index('idx_report_status').on(table.status),

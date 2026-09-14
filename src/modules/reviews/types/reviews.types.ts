@@ -18,7 +18,6 @@ export interface CreateReviewInput {
 export interface ReviewResponse {
   publicId: string;
   companyId: string;
-  nickname: string | null;
   companyName: string | null;
   companySlug: string | null;
   title: string;
@@ -44,7 +43,6 @@ export interface ReviewResponse {
 export function toReviewResponse(review: {
   publicId: string;
   companyId: string;
-  nickname: string | null;
   companyName: string | null;
   companySlug: string | null;
   title: string;
@@ -69,7 +67,6 @@ export function toReviewResponse(review: {
   return {
     publicId: review.publicId,
     companyId: review.companyId,
-    nickname: review.nickname,
     companyName: review.companyName,
     companySlug: review.companySlug,
     title: review.title,

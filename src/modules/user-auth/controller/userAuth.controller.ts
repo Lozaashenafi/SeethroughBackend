@@ -4,8 +4,7 @@ import { sendSuccess, sendError } from '../../../shared/responses/index.js';
 import { userAuthService } from '../service/userAuth.service.js';
 import { toUserProfile } from '../types/userAuth.types.js';
 import { env } from '../../../config/env.js';
-
-const USER_TOKEN_COOKIE = 'user_token';
+import { USER_TOKEN_COOKIE } from '../../../shared/constants/index.js';
 
 class UserAuthController {
   async register(req: Request, res: Response, _next: NextFunction): Promise<void> {
@@ -16,7 +15,7 @@ class UserAuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
     });
 
@@ -31,11 +30,31 @@ class UserAuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
     });
 
     sendSuccess(res, { user: result.user }, 'Logged in successfully');
+  }
+
+  async adminLogin(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { email, password } = req.body;
+    const result = await userAuthService.login(email, password);
+
+    if (result.user.role !== 'admin') {
+      sendError(res, 'Admin access required', 403);
+      return;
+    }
+
+    res.cookie(USER_TOKEN_COOKIE, result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
+    sendSuccess(res, { user: result.user }, 'Admin login successful');
   }
 
   async googleCallback(req: Request, res: Response, _next: NextFunction): Promise<void> {
@@ -114,7 +133,6 @@ class UserAuthController {
   async forgotPassword(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { email } = req.body;
     await userAuthService.forgotPassword(email);
-    // Always return success to prevent email enumeration
     sendSuccess(res, null, 'If an account exists with this email, a reset link has been sent');
   }
 
@@ -127,15 +145,6 @@ class UserAuthController {
   async me(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const profile = await userAuthService.getProfile(req.user!.userId);
     sendSuccess(res, toUserProfile(profile), 'Profile retrieved');
-  }
-
-  async updateShowDisplayName(req: Request, res: Response, _next: NextFunction): Promise<void> {
-    const { showDisplayName } = req.body;
-    const profile = await userAuthService.updateShowDisplayName(
-      req.user!.userId,
-      showDisplayName,
-    );
-    sendSuccess(res, toUserProfile(profile), 'Display name preference updated');
   }
 
   async updateDisplayName(req: Request, res: Response, _next: NextFunction): Promise<void> {

@@ -15,6 +15,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "db:reset": "tsx src/database/reset.ts && pnpm db:seed",
     "db:seed": "tsx src/database/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest"

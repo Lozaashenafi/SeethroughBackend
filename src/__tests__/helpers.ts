@@ -9,6 +9,8 @@ interface ApiOptions {
   body?: Record<string, unknown>;
   cookie?: string;
   query?: Record<string, string | number | undefined>;
+  /** Extra request headers, e.g. a synthetic X-Forwarded-For to isolate rate limits. */
+  headers?: Record<string, string>;
 }
 
 export function apiCall(method: HttpMethod, url: string, options: ApiOptions = {}) {
@@ -25,6 +27,12 @@ export function apiCall(method: HttpMethod, url: string, options: ApiOptions = {
 
   if (options.query) {
     req.query(options.query);
+  }
+
+  if (options.headers) {
+    for (const [key, value] of Object.entries(options.headers)) {
+      req.set(key, value);
+    }
   }
 
   return req;

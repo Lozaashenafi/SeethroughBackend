@@ -7,7 +7,7 @@ class CommentsController {
   async create(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const comment = await commentsService.create({
       ...req.body,
-      anonymousId: req.anonymous!.id,
+      userId: req.user!.userId,
     });
     sendSuccess(res, toCommentResponse(comment), 'Comment created', 201);
   }

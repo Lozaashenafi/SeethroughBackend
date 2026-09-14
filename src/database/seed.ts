@@ -1,13 +1,11 @@
-import { nanoid } from 'nanoid';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import { db, closePool } from './db.js';
 import { industries } from './schema/industry.js';
 import { tags } from './schema/tag.js';
 import { companies } from './schema/company.js';
-import { admins } from './schema/admin.js';
-import { anonymousIdentities } from './schema/anonymousIdentity.js';
+import { users } from './schema/user.js';
 import { reviews } from './schema/review.js';
 import { reviewTags } from './schema/reviewTag.js';
 import { logger } from '../config/logger.js';
@@ -25,9 +23,9 @@ const generateSlug = (text: string): string => {
     .toString()
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, "-") 
-    .replace(/[^\w\u1200-\u137F-]+/g, "") 
-    .replace(/\-\-+/g, "-") 
+    .replace(/\s+/g, "-")
+    .replace(/[^\w\u1200-\u137F-]+/g, "")
+    .replace(/\-\-+/g, "-")
     // Ensure uniqueness with a CSPRNG suffix (hex) instead of Math.random().
     .concat("-" + randomBytes(4).toString("hex"));
 };
@@ -90,13 +88,15 @@ async function seed(): Promise<void> {
   }
   logger.info(`  ✓ ${tagData.length} tags seeded`);
 
-  // ─── 3. Admin ───
+  // ─── 3. Admin User ───
   const passwordHash = await bcrypt.hash(SEED_ADMIN_PASSWORD, 10);
-  await db.insert(admins).values({
+  await db.insert(users).values({
     email: SEED_ADMIN_EMAIL,
     passwordHash,
-    name: SEED_ADMIN_NAME,
-  }).onConflictDoNothing({ target: admins.email });
+    displayName: SEED_ADMIN_NAME,
+    role: 'admin',
+    emailVerified: true,
+  }).onConflictDoNothing({ target: users.email });
   logger.info(`  ✓ Admin user seeded (${SEED_ADMIN_EMAIL})`);
 
   // ─── 4. Sample Global Companies (Required for sample reviews) ───
@@ -307,18 +307,11 @@ async function seed(): Promise<void> {
   }
   logger.info(`  ✓ ${newEthiopianNames.length} Ethiopian companies seeded`);
 
-  // ─── 7. Anonymous Identity ───
-  const sessionToken = nanoid(32);
-  const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
-  const [anonIdentity] = await db.insert(anonymousIdentities).values({
-    publicId: nanoid(16),
-    sessionTokenHash: tokenHash,
-  }).onConflictDoNothing({ target: anonymousIdentities.publicId }).returning();
+  // ─── 7. Sample Reviews (using admin user) ───
+  const adminUser = await db.select().from(users).where(eq(users.email, SEED_ADMIN_EMAIL)).limit(1);
+  const userId = adminUser[0]?.id;
 
-  const anonId = anonIdentity?.id ?? (await db.select().from(anonymousIdentities).limit(1))[0]?.id;
-
-  // ─── 8. Sample Reviews ───
-  if (anonId) {
+  if (userId) {
     const reviewData = [
       { companySlug: 'google', title: 'Great place for engineers', overallRating: 4, tagNames: ['Good Culture', 'Great Benefits'] },
       { companySlug: 'stripe', title: 'Best engineering culture', overallRating: 5, tagNames: ['Good Culture', 'Remote Friendly'] },
@@ -338,7 +331,7 @@ async function seed(): Promise<void> {
 
       const [insertedReview] = await db.insert(reviews).values({
         publicId: `seed-${review.companySlug}`,
-        anonymousId: anonId,
+        userId,
         companyId: company.id,
         title: review.title,
         pros: 'Pros list here...',
@@ -358,7 +351,7 @@ async function seed(): Promise<void> {
     }
   }
 
-  // ─── 9. Consolidate Stats ───
+  // ─── 8. Consolidate Stats ───
   logger.info('  Consolidating stats...');
   const finalCompanies = await db.select().from(companies);
   for (const company of finalCompanies) {

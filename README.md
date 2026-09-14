@@ -140,6 +140,36 @@ pnpm dev
 | `pnpm db:migrate` | Run pending migrations |
 | `pnpm db:push` | Push schema to database |
 | `pnpm db:studio` | Open Drizzle Studio |
+| `pnpm db:reset` | Drop both schemas, replay all migrations, reseed (local only) |
+
+### Resetting the database (dev)
+
+The migration history was squashed into a single baseline (`0000_mean_loa.sql`)
+that matches `src/database/schema`, so a fresh database can be rebuilt in one
+step:
+
+```bash
+pnpm db:reset   # drops schemas "public" and "drizzle", migrates, seeds
+```
+
+`public` (application tables) and `drizzle` (the applied-migration ledger) are
+dropped together — dropping only `public` leaves ledger rows from the previous
+chain behind, which makes the next `pnpm db:migrate` try to re-run migrations
+whose tables already exist. The script refuses to run when `NODE_ENV` is
+`production`.
+
+Equivalent manual commands, if you prefer to drive it yourself:
+
+```bash
+DB="$(grep -E '^DATABASE_URL=' .env | cut -d= -f2-)"
+psql "$DB" -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+psql "$DB" -c 'DROP SCHEMA drizzle CASCADE;'
+pnpm db:migrate && pnpm db:seed
+```
+
+`pnpm db:generate` now writes the next incremental migration from the baseline,
+so schema changes go back to the normal flow: edit `src/database/schema`, then
+`pnpm db:generate` + `pnpm db:migrate`.
 
 ### Deploying to production (Render / Vercel)
 
@@ -158,6 +188,26 @@ DATABASE_URL="postgres://..." pnpm db:migrate
 Then redeploy (or just restart the service) — the app will migrate on boot
 anyway. If the companies list is empty after migrating, re-run the seed:
 `DATABASE_URL="postgres://..." pnpm db:seed`.
+
+> **Note on the squashed migration chain.** A database that already ran the old
+> migrations 0000–0007 still has its ledger rows in `drizzle.__drizzle_migrations`,
+> but those files no longer exist. On boot, `migrate()` finds no applied entry
+> for the new baseline and replays it, which fails on the first `CREATE TABLE`
+> (the tables are already there). The failure is caught and logged, so the app
+> keeps serving, but no further migration will apply.
+>
+> The baseline is not idempotent, so a production database that must keep its
+> data cannot simply be re-migrated. Migrate it into a fresh database instead:
+>
+> ```bash
+> pg_dump --schema=public "$OLD_DATABASE_URL" > data.sql
+> psql "$NEW_DATABASE_URL" < data.sql
+> DATABASE_URL="$NEW_DATABASE_URL" pnpm db:migrate
+> ```
+>
+> `--schema=public` keeps the old `drizzle` ledger out of the dump, so the new
+> one starts clean. For a production database whose data is disposable, run the
+> same steps as local: drop both schemas, `pnpm db:migrate`, `pnpm db:seed`.
 
 ## API Endpoints
 

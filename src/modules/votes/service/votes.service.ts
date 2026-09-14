@@ -5,7 +5,7 @@ import { AppError } from '../../../shared/errors/AppError.js';
 
 class VotesService {
   async vote(input: {
-    anonymousId: string;
+    userId: string;
     reviewPublicId: string;
     voteType: 'helpful' | 'unhelpful';
   }) {
@@ -20,7 +20,7 @@ class VotesService {
     const result = await db.transaction(async (tx) => {
       const vote = await votesRepository.upsertWithClient(tx, {
         reviewId: review.id,
-        anonymousId: input.anonymousId,
+        userId: input.userId,
         voteType: input.voteType,
       });
 

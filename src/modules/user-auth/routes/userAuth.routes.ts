@@ -11,7 +11,6 @@ import {
   verifyEmailSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
-  updateShowDisplayNameSchema,
   updateDisplayNameSchema,
   changePasswordSchema,
   setPasswordSchema,
@@ -71,6 +70,13 @@ userAuthRoutes.post(
 );
 
 userAuthRoutes.post(
+  '/admin/login',
+  loginLimiter,
+  validate({ body: loginSchema }),
+  asyncHandler(userAuthController.adminLogin.bind(userAuthController)),
+);
+
+userAuthRoutes.post(
   '/google',
   validate({ body: googleCallbackSchema }),
   asyncHandler(userAuthController.googleCallback.bind(userAuthController)),
@@ -101,13 +107,6 @@ userAuthRoutes.post(
   registerLimiter,
   userAuth(),
   asyncHandler(userAuthController.resendVerification.bind(userAuthController)),
-);
-
-userAuthRoutes.patch(
-  '/show-display-name',
-  userAuth(),
-  validate({ body: updateShowDisplayNameSchema }),
-  asyncHandler(userAuthController.updateShowDisplayName.bind(userAuthController)),
 );
 
 userAuthRoutes.patch(

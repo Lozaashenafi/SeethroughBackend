@@ -7,7 +7,7 @@ import type { ReportStatus } from '../types/reports.types.js';
 
 class ReportsService {
   async create(input: {
-    anonymousId: string;
+    userId: string;
     reviewPublicId?: string;
     commentPublicId?: string;
     reason: string;
@@ -48,7 +48,7 @@ class ReportsService {
     }
 
     return reportsRepository.create({
-      anonymousId: input.anonymousId,
+      userId: input.userId,
       reviewId,
       commentId,
       reason: input.reason,

@@ -27,4 +27,4 @@ WHERE target.nickname IS NOT NULL
 -- From here on the database itself rejects a duplicate nickname (the service
 -- keeps generating unique ones and gives a friendly 409 for taken custom
 -- names).
-CREATE UNIQUE INDEX "idx_anonymous_nickname_unique" ON "anonymous_identities" USING btree (lower("nickname"));
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_anonymous_nickname_unique" ON "anonymous_identities" USING btree (lower("nickname"));

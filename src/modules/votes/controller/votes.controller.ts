@@ -7,7 +7,7 @@ class VotesController {
   async vote(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const vote = await votesService.vote({
       ...req.body,
-      anonymousId: req.anonymous!.id,
+      userId: req.user!.userId,
     });
     sendSuccess(res, toVoteResponse(vote), 'Vote recorded');
   }

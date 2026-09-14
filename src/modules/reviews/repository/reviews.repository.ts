@@ -7,14 +7,12 @@ import { reviewTags } from '../../../database/schema/reviewTag.js';
 import { comments } from '../../../database/schema/comment.js';
 import { reviewVotes } from '../../../database/schema/reviewVote.js';
 import { reports } from '../../../database/schema/report.js';
-import { anonymousIdentities } from '../../../database/schema/anonymousIdentity.js';
 import type { CreateReviewInput } from '../types/reviews.types.js';
 
 type DbClient = typeof db | DatabaseTx;
 
 type CreateReviewRecord = CreateReviewInput & {
-  anonymousId: string;
-  userId?: string | null;
+  userId: string;
   companyId: string;
   status: 'published' | 'pending' | 'rejected';
   contentFingerprint: string;
@@ -23,9 +21,7 @@ type CreateReviewRecord = CreateReviewInput & {
 const reviewColumns = {
   id: reviews.id,
   publicId: reviews.publicId,
-  anonymousId: reviews.anonymousId,
   userId: reviews.userId,
-  nickname: anonymousIdentities.nickname,
   companyId: reviews.companyId,
   companyName: companies.name,
   companySlug: companies.slug,
@@ -52,9 +48,7 @@ const reviewColumns = {
 interface ReviewRow {
   id: number;
   publicId: string;
-  anonymousId: string;
-  userId: string | null;
-  nickname: string | null;
+  userId: string;
   companyId: string;
   companyName: string | null;
   companySlug: string | null;
@@ -90,8 +84,7 @@ export class ReviewsRepository {
       .insert(reviews)
       .values({
         publicId,
-        anonymousId: input.anonymousId,
-        userId: input.userId ?? null,
+        userId: input.userId,
         companyId: input.companyId,
         title: input.title,
         pros: input.pros ?? null,
@@ -133,7 +126,6 @@ export class ReviewsRepository {
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
       .where(eq(reviews.publicId, publicId));
     return review ?? null;
   }
@@ -142,16 +134,15 @@ export class ReviewsRepository {
     return this.findByIdWithClient(db, id);
   }
 
-  async findByAnonymousAndCompany(
-    anonymousId: string,
+  async findByUserAndCompany(
+    userId: string,
     companyId: string,
   ): Promise<ReviewRow | null> {
     const [review] = await db
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
-      .where(and(eq(reviews.anonymousId, anonymousId), eq(reviews.companyId, companyId)));
+      .where(and(eq(reviews.userId, userId), eq(reviews.companyId, companyId)));
     return review ?? null;
   }
 
@@ -161,15 +152,14 @@ export class ReviewsRepository {
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
       .where(and(eq(reviews.status, 'published'), sql`${reviews.createdAt} >= ${since}`))
       .orderBy(desc(reviews.createdAt))
       .limit(limit);
   }
 
-  /** All reviews (any moderation status) authored by an identity, newest first. */
-  async findByAnonymousId(
-    anonymousId: string,
+  /** All reviews (any moderation status) authored by a user, newest first. */
+  async findByUserId(
+    userId: string,
     params: { page: number; limit: number },
   ): Promise<{ data: ReviewRow[]; total: number }> {
     const offset = (params.page - 1) * params.limit;
@@ -178,8 +168,7 @@ export class ReviewsRepository {
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
-      .where(eq(reviews.anonymousId, anonymousId))
+      .where(eq(reviews.userId, userId))
       .orderBy(desc(reviews.createdAt))
       .limit(params.limit)
       .offset(offset);
@@ -187,19 +176,18 @@ export class ReviewsRepository {
     const [totalResult] = await db
       .select({ total: count() })
       .from(reviews)
-      .where(eq(reviews.anonymousId, anonymousId));
+      .where(eq(reviews.userId, userId));
 
     return { data, total: totalResult?.total ?? 0 };
   }
 
-  /** Every review (any moderation status) authored by an identity, newest first. */
-  async findAllByAnonymousId(anonymousId: string, limit = 1000): Promise<ReviewRow[]> {
+  /** Every review (any moderation status) authored by a user, newest first. */
+  async findAllByUserId(userId: string, limit = 1000): Promise<ReviewRow[]> {
     return db
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
-      .where(eq(reviews.anonymousId, anonymousId))
+      .where(eq(reviews.userId, userId))
       .orderBy(desc(reviews.createdAt))
       .limit(limit);
   }
@@ -210,7 +198,6 @@ export class ReviewsRepository {
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
       .where(eq(reviews.contentFingerprint, fingerprint))
       .limit(1);
     return review ?? null;
@@ -221,7 +208,6 @@ export class ReviewsRepository {
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
       .where(eq(reviews.id, id));
     return review ?? null;
   }
@@ -243,7 +229,6 @@ export class ReviewsRepository {
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
       .where(whereClause)
       .orderBy(orderBy)
       .limit(params.limit)
@@ -293,7 +278,7 @@ export class ReviewsRepository {
   /**
    * Update an existing review's editable fields. Undefined values are left
    * untouched; null values clear the field. Returns the refreshed row (with
-   * company + nickname joins) or null when the review no longer exists.
+   * company joins) or null when the review no longer exists.
    */
   async updateWithClient(
     client: DbClient,
@@ -393,7 +378,6 @@ export class ReviewsRepository {
       .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .leftJoin(anonymousIdentities, eq(reviews.anonymousId, anonymousIdentities.id))
       .where(whereClause)
       .orderBy(orderBy)
       .limit(params.limit)

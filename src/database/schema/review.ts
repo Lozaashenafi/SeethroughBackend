@@ -9,7 +9,6 @@ import {
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { anonymousIdentities } from './anonymousIdentity.js';
 import { companies } from './company.js';
 import { users } from './user.js';
 
@@ -18,13 +17,7 @@ export const reviews = pgTable(
   {
     id: serial('id').primaryKey(),
     publicId: text('public_id').notNull().unique(),
-    anonymousId: uuid('anonymous_id')
-      .notNull()
-      .references(() => anonymousIdentities.id),
-    // Linked to the authenticated user who wrote this review. Null for reviews
-    // created before user accounts existed. This column is NEVER exposed in
-    // public API responses — it exists solely for backend ownership checks.
-    userId: uuid('user_id').references(() => users.id),
+    userId: uuid('user_id').notNull().references(() => users.id),
     companyId: uuid('company_id')
       .notNull()
       .references(() => companies.id),
@@ -43,11 +36,7 @@ export const reviews = pgTable(
     }),
     jobTitle: text('job_title'),
     isVerified: boolean('is_verified').default(false).notNull(),
-    // One-way sha256 fingerprint of normalized title/pros/cons, used for
-    // duplicate detection without storing raw copies.
     contentFingerprint: text('content_fingerprint'),
-    // Moderation state: published reviews are visible publicly; pending reviews
-    // wait in the admin moderation queue; rejected reviews are never shown.
     status: text('status', { enum: ['published', 'pending', 'rejected'] })
       .default('published')
       .notNull(),
@@ -58,14 +47,12 @@ export const reviews = pgTable(
   },
   (table) => ({
     publicIdIdx: index('idx_review_public_id').on(table.publicId),
-    anonymousIdx: index('idx_review_anonymous').on(table.anonymousId),
+    userIdx: index('idx_review_user').on(table.userId),
     companyIdx: index('idx_review_company').on(table.companyId),
     createdAtIdx: index('idx_review_created_at').on(table.createdAt),
     ratingIdx: index('idx_review_rating').on(table.overallRating),
-    // One review per identity per company, enforced at the database level so a
-    // concurrent double-submit can never slip past the service check.
-    anonymousCompanyUnique: uniqueIndex('idx_review_anonymous_company_unique').on(
-      table.anonymousId,
+    userCompanyUnique: uniqueIndex('idx_review_user_company_unique').on(
+      table.userId,
       table.companyId,
     ),
   }),

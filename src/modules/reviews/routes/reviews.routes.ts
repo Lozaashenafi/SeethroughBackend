@@ -1,9 +1,6 @@
 import { Router } from 'express';
 import { reviewsController } from '../controller/reviews.controller.js';
-import { anonymousIdentity } from '../../../middlewares/anonymousIdentity.middleware.js';
-import { adminAuth } from '../../../middlewares/adminAuth.middleware.js';
 import { userAuth } from '../../../middlewares/userAuth.middleware.js';
-import { temporarilyBlockedGuard } from '../../../middlewares/temporarilyBlockedGuard.middleware.js';
 import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
@@ -21,7 +18,6 @@ const reviewsRoutes = Router();
 // Public routes
 reviewsRoutes.get(
   '/',
-  anonymousIdentity(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ query: listReviewsQuerySchema }),
   asyncHandler(reviewsController.listByCompany.bind(reviewsController)),
@@ -29,7 +25,6 @@ reviewsRoutes.get(
 
 reviewsRoutes.get(
   '/:publicId',
-  anonymousIdentity(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ params: reviewPublicIdParamsSchema }),
   asyncHandler(reviewsController.getByPublicId.bind(reviewsController)),
@@ -38,7 +33,7 @@ reviewsRoutes.get(
 // Tag ids for a review (used to prefill the edit form).
 reviewsRoutes.get(
   '/:publicId/tags',
-  anonymousIdentity(),
+  userAuth(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ params: reviewPublicIdParamsSchema }),
   asyncHandler(reviewsController.getTags.bind(reviewsController)),
@@ -47,9 +42,7 @@ reviewsRoutes.get(
 // Edit your own review. Ownership is checked in the service (404 for others).
 reviewsRoutes.put(
   '/:publicId',
-  anonymousIdentity(),
-  userAuth(),
-  temporarilyBlockedGuard(),
+  userAuth({ required: true }),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ params: reviewPublicIdParamsSchema, body: updateReviewSchema }),
   asyncHandler(reviewsController.update.bind(reviewsController)),
@@ -58,9 +51,7 @@ reviewsRoutes.put(
 // Create a review — requires authenticated user with verified email
 reviewsRoutes.post(
   '/',
-  anonymousIdentity(),
-  userAuth({ required: true, verifiedOnly: true }),
-  temporarilyBlockedGuard(),
+  userAuth({ required: true, verifiedOnly: true, enforceActive: true }),
   createRateLimiter(RATE_LIMITS.REVIEW_CREATE),
   validate({ body: createReviewSchema }),
   asyncHandler(reviewsController.create.bind(reviewsController)),
@@ -69,7 +60,7 @@ reviewsRoutes.post(
 // Admin-only routes
 reviewsRoutes.get(
   '/admin/all',
-  adminAuth(),
+  userAuth({ adminOnly: true }),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ query: listReviewsQuerySchema }),
   asyncHandler(reviewsController.listAll.bind(reviewsController)),
@@ -77,7 +68,7 @@ reviewsRoutes.get(
 
 reviewsRoutes.get(
   '/admin/:publicId',
-  adminAuth(),
+  userAuth({ adminOnly: true }),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ params: reviewPublicIdParamsSchema }),
   asyncHandler(reviewsController.adminGetByPublicId.bind(reviewsController)),
@@ -85,7 +76,7 @@ reviewsRoutes.get(
 
 reviewsRoutes.patch(
   '/admin/:publicId/status',
-  adminAuth(),
+  userAuth({ adminOnly: true }),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ params: reviewPublicIdParamsSchema, body: moderateReviewSchema }),
   asyncHandler(reviewsController.moderate.bind(reviewsController)),
@@ -93,7 +84,7 @@ reviewsRoutes.patch(
 
 reviewsRoutes.delete(
   '/:publicId',
-  adminAuth(),
+  userAuth({ adminOnly: true }),
   validate({ params: reviewPublicIdParamsSchema }),
   asyncHandler(reviewsController.delete.bind(reviewsController)),
 );

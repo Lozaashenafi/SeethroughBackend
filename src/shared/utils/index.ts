@@ -54,7 +54,6 @@ export function asyncHandler(
   };
 }
 
-export { generateNickname } from './nickname.js';
 export {
   contentFingerprint,
   textSimilarity,

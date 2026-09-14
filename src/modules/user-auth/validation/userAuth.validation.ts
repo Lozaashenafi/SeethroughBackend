@@ -41,10 +41,6 @@ export const resetPasswordSchema = z.object({
     .max(128, 'Password must be at most 128 characters'),
 });
 
-export const updateShowDisplayNameSchema = z.object({
-  showDisplayName: z.boolean(),
-});
-
 export const updateDisplayNameSchema = z.object({
   displayName: z
     .string()

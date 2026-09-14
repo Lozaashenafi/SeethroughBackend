@@ -7,15 +7,14 @@ class ReviewsController {
   async create(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const review = await reviewsService.create({
       ...req.body,
-      anonymousId: req.anonymous!.id,
-      userId: req.user?.userId ?? null,
+      userId: req.user!.userId,
     });
     sendSuccess(res, toReviewResponse(review), 'Review created', 201);
   }
 
   async update(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { publicId } = req.params;
-    const review = await reviewsService.update(publicId, req.anonymous!.id, req.body, req.user?.userId);
+    const review = await reviewsService.update(publicId, req.user!.userId, req.body);
     sendSuccess(res, toReviewResponse(review), 'Review updated');
   }
 
@@ -27,7 +26,7 @@ class ReviewsController {
 
   async getTags(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { publicId } = req.params;
-    const tagIds = await reviewsService.getTags(publicId, req.anonymous!.id);
+    const tagIds = await reviewsService.getTags(publicId, req.user?.userId);
     sendSuccess(res, { tagIds }, 'Review tags retrieved');
   }
 

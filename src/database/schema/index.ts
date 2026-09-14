@@ -1,5 +1,3 @@
-export * from './admin.js';
-export * from './anonymousIdentity.js';
 export * from './comment.js';
 export * from './company.js';
 export * from './industry.js';

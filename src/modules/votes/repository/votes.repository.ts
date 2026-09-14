@@ -9,7 +9,7 @@ type DbClient = typeof db | DatabaseTx;
 interface VoteRow {
   id: number;
   reviewId: number;
-  anonymousId: string;
+  userId: string;
   voteType: string;
   createdAt: Date;
 }
@@ -25,7 +25,7 @@ interface VoteActivityRow {
 export class VotesRepository {
   async upsert(input: {
     reviewId: number;
-    anonymousId: string;
+    userId: string;
     voteType: 'helpful' | 'unhelpful';
   }): Promise<VoteRow> {
     return this.upsertWithClient(db, input);
@@ -33,18 +33,18 @@ export class VotesRepository {
 
   async upsertWithClient(client: DbClient, input: {
     reviewId: number;
-    anonymousId: string;
+    userId: string;
     voteType: 'helpful' | 'unhelpful';
   }): Promise<VoteRow> {
     const [vote] = await client
       .insert(reviewVotes)
       .values({
         reviewId: input.reviewId,
-        anonymousId: input.anonymousId,
+        userId: input.userId,
         voteType: input.voteType,
       })
       .onConflictDoUpdate({
-        target: [reviewVotes.reviewId, reviewVotes.anonymousId],
+        target: [reviewVotes.reviewId, reviewVotes.userId],
         set: {
           voteType: input.voteType,
           createdAt: new Date(),
@@ -54,9 +54,9 @@ export class VotesRepository {
     return vote;
   }
 
-  async findByReviewAndAnonymous(
+  async findByReviewAndUser(
     reviewId: number,
-    anonymousId: string,
+    userId: string,
   ): Promise<VoteRow | null> {
     const [vote] = await db
       .select()
@@ -64,15 +64,15 @@ export class VotesRepository {
       .where(
         and(
           eq(reviewVotes.reviewId, reviewId),
-          eq(reviewVotes.anonymousId, anonymousId),
+          eq(reviewVotes.userId, userId),
         ),
       );
     return vote ?? null;
   }
 
-  /** All votes cast by an identity, newest first, with target review info. */
-  async findByAnonymousId(
-    anonymousId: string,
+  /** All votes cast by a user, newest first, with target review info. */
+  async findByUserId(
+    userId: string,
     params: { page: number; limit: number },
   ): Promise<{ data: VoteActivityRow[]; total: number }> {
     const offset = (params.page - 1) * params.limit;
@@ -88,7 +88,7 @@ export class VotesRepository {
       .from(reviewVotes)
       .leftJoin(reviews, eq(reviewVotes.reviewId, reviews.id))
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .where(eq(reviewVotes.anonymousId, anonymousId))
+      .where(eq(reviewVotes.userId, userId))
       .orderBy(desc(reviewVotes.createdAt))
       .limit(params.limit)
       .offset(offset);
@@ -96,7 +96,7 @@ export class VotesRepository {
     const [totalResult] = await db
       .select({ total: count() })
       .from(reviewVotes)
-      .where(eq(reviewVotes.anonymousId, anonymousId));
+      .where(eq(reviewVotes.userId, userId));
 
     return { data, total: totalResult?.total ?? 0 };
   }

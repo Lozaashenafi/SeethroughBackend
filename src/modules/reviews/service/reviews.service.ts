@@ -1,9 +1,5 @@
 import { reviewsRepository } from '../repository/reviews.repository.js';
 import { companiesRepository } from '../../companies/repository/companies.repository.js';
-import { userAuthRepository } from '../../user-auth/repository/userAuth.repository.js';
-import { anonymousIdentities } from '../../../database/schema/anonymousIdentity.js';
-import { db } from '../../../database/db.js';
-import { eq } from 'drizzle-orm';
 import { AppError } from '../../../shared/errors/AppError.js';
 import {
   contentFingerprint,
@@ -11,6 +7,7 @@ import {
   NEAR_DUPLICATE_THRESHOLD,
   findBadWordsInFields,
 } from '../../../shared/utils/index.js';
+import { db } from '../../../database/db.js';
 import type { CreateReviewInput } from '../types/reviews.types.js';
 
 // Returns a 400 error listing the profane terms found, so the reviewer knows
@@ -31,19 +28,19 @@ const DUP_SCREEN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const DUP_SCREEN_LIMIT = 200;
 
 class ReviewsService {
-  async create(input: CreateReviewInput & { anonymousId: string; userId?: string | null }) {
+  async create(input: CreateReviewInput & { userId: string }) {
     // Verify company exists (lookup by slug)
     const company = await companiesRepository.findBySlug(input.companySlug);
     if (!company) {
       throw new AppError('Company not found', 404);
     }
 
-    // One review per company per identity, period. The rate limit alone is not
+    // One review per company per user, period. The rate limit alone is not
     // a reliable guard, so enforce it here too — a second review of the same
     // company is rejected outright (the author can still edit their existing
     // review via its edit page).
-    const existing = await reviewsRepository.findByAnonymousAndCompany(
-      input.anonymousId,
+    const existing = await reviewsRepository.findByUserAndCompany(
+      input.userId,
       company.id,
     );
     if (existing) {
@@ -102,23 +99,8 @@ class ReviewsService {
     // Review insert, tag links and company stats update are committed
     // atomically so a failure never leaves a half-created review or stale stats.
     const review = await db.transaction(async (tx) => {
-      // Update the anonymous identity's nickname based on user preference.
-      // If the user wants to show their name, set nickname to their display name.
-      // Otherwise, set it to null so it displays as "Anonymous".
-      if (input.userId) {
-        const userProfile = await userAuthRepository.getProfile(input.userId);
-        if (userProfile) {
-          const nickname = userProfile.showDisplayName ? userProfile.displayName : null;
-          await tx
-            .update(anonymousIdentities)
-            .set({ nickname })
-            .where(eq(anonymousIdentities.id, input.anonymousId));
-        }
-      }
-
       const created = await reviewsRepository.createWithClient(tx, {
-        anonymousId: input.anonymousId,
-        userId: input.userId ?? null,
+        userId: input.userId,
         companyId: company.id,
         companySlug: input.companySlug,
         title: input.title,
@@ -158,17 +140,15 @@ class ReviewsService {
    */
   async update(
     publicId: string,
-    anonymousId: string,
+    userId: string,
     input: Omit<CreateReviewInput, 'companySlug'>,
-    userId?: string,
   ) {
     const review = await reviewsRepository.findByPublicId(publicId);
     if (!review) {
       throw new AppError('Review not found', 404);
     }
-    // Ownership: either the anonymous identity matches, or the authenticated user owns it
-    const isOwner = review.anonymousId === anonymousId || (userId != null && review.userId === userId);
-    if (!isOwner) {
+    // Ownership: the authenticated user must own this review
+    if (review.userId !== userId) {
       throw new AppError('Review not found', 404);
     }
 
@@ -266,12 +246,12 @@ class ReviewsService {
    * only read tags of published reviews; the review's author may read tags
    * regardless of moderation status so the edit form can prefill honestly.
    */
-  async getTags(publicId: string, anonymousId?: string): Promise<number[]> {
+  async getTags(publicId: string, userId?: string): Promise<number[]> {
     const review = await reviewsRepository.findByPublicId(publicId);
     if (!review) {
       throw new AppError('Review not found', 404);
     }
-    const isOwner = anonymousId !== undefined && review.anonymousId === anonymousId;
+    const isOwner = userId !== undefined && review.userId === userId;
     if (review.status !== 'published' && !isOwner) {
       throw new AppError('Review not found', 404);
     }

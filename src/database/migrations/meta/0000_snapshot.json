@@ -1,181 +1,9 @@
 {
-  "id": "ea042ec2-8d66-445c-b45c-1cd5801c05e7",
+  "id": "fc17d0ea-e0b0-472e-9bc4-f96ec8402d30",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.admins": {
-      "name": "admins",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "email": {
-          "name": "email",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "password_hash": {
-          "name": "password_hash",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "admins_email_unique": {
-          "name": "admins_email_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.anonymous_identities": {
-      "name": "anonymous_identities",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "public_id": {
-          "name": "public_id",
-          "type": "varchar(32)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "session_token_hash": {
-          "name": "session_token_hash",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'active'"
-        },
-        "risk_score": {
-          "name": "risk_score",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "is_blocked": {
-          "name": "is_blocked",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "last_seen_at": {
-          "name": "last_seen_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_anonymous_public_id": {
-          "name": "idx_anonymous_public_id",
-          "columns": [
-            {
-              "expression": "public_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_anonymous_status": {
-          "name": "idx_anonymous_status",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "anonymous_identities_public_id_unique": {
-          "name": "anonymous_identities_public_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "public_id"
-          ]
-        },
-        "anonymous_identities_session_token_hash_unique": {
-          "name": "anonymous_identities_session_token_hash_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "session_token_hash"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.comments": {
       "name": "comments",
       "schema": "",
@@ -192,8 +20,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "anonymous_id": {
-          "name": "anonymous_id",
+        "user_id": {
+          "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -254,11 +82,11 @@
           "method": "btree",
           "with": {}
         },
-        "idx_comment_review": {
-          "name": "idx_comment_review",
+        "idx_comment_user": {
+          "name": "idx_comment_user",
           "columns": [
             {
-              "expression": "review_id",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -269,11 +97,11 @@
           "method": "btree",
           "with": {}
         },
-        "idx_comment_anonymous": {
-          "name": "idx_comment_anonymous",
+        "idx_comment_review": {
+          "name": "idx_comment_review",
           "columns": [
             {
-              "expression": "anonymous_id",
+              "expression": "review_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -301,12 +129,12 @@
         }
       },
       "foreignKeys": {
-        "comments_anonymous_id_anonymous_identities_id_fk": {
-          "name": "comments_anonymous_id_anonymous_identities_id_fk",
+        "comments_user_id_users_id_fk": {
+          "name": "comments_user_id_users_id_fk",
           "tableFrom": "comments",
-          "tableTo": "anonymous_identities",
+          "tableTo": "users",
           "columnsFrom": [
-            "anonymous_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -589,8 +417,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "anonymous_id": {
-          "name": "anonymous_id",
+        "user_id": {
+          "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -656,11 +484,11 @@
           "method": "btree",
           "with": {}
         },
-        "idx_report_anonymous": {
-          "name": "idx_report_anonymous",
+        "idx_report_user": {
+          "name": "idx_report_user",
           "columns": [
             {
-              "expression": "anonymous_id",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -718,12 +546,12 @@
         }
       },
       "foreignKeys": {
-        "reports_anonymous_id_anonymous_identities_id_fk": {
-          "name": "reports_anonymous_id_anonymous_identities_id_fk",
+        "reports_user_id_users_id_fk": {
+          "name": "reports_user_id_users_id_fk",
           "tableFrom": "reports",
-          "tableTo": "anonymous_identities",
+          "tableTo": "users",
           "columnsFrom": [
-            "anonymous_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -788,8 +616,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "anonymous_id": {
-          "name": "anonymous_id",
+        "user_id": {
+          "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -879,6 +707,19 @@
           "notNull": true,
           "default": false
         },
+        "content_fingerprint": {
+          "name": "content_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'published'"
+        },
         "helpful_count": {
           "name": "helpful_count",
           "type": "integer",
@@ -924,11 +765,11 @@
           "method": "btree",
           "with": {}
         },
-        "idx_review_anonymous": {
-          "name": "idx_review_anonymous",
+        "idx_review_user": {
+          "name": "idx_review_user",
           "columns": [
             {
-              "expression": "anonymous_id",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -983,15 +824,36 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_review_user_company_unique": {
+          "name": "idx_review_user_company_unique",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "reviews_anonymous_id_anonymous_identities_id_fk": {
-          "name": "reviews_anonymous_id_anonymous_identities_id_fk",
+        "reviews_user_id_users_id_fk": {
+          "name": "reviews_user_id_users_id_fk",
           "tableFrom": "reviews",
-          "tableTo": "anonymous_identities",
+          "tableTo": "users",
           "columnsFrom": [
-            "anonymous_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -1138,8 +1000,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "anonymous_id": {
-          "name": "anonymous_id",
+        "user_id": {
+          "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -1169,7 +1031,7 @@
               "nulls": "last"
             },
             {
-              "expression": "anonymous_id",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1210,12 +1072,12 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "review_votes_anonymous_id_anonymous_identities_id_fk": {
-          "name": "review_votes_anonymous_id_anonymous_identities_id_fk",
+        "review_votes_user_id_users_id_fk": {
+          "name": "review_votes_user_id_users_id_fk",
           "tableFrom": "review_votes",
-          "tableTo": "anonymous_identities",
+          "tableTo": "users",
           "columnsFrom": [
-            "anonymous_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -1292,6 +1154,163 @@
           "nullsNotDistinct": false,
           "columns": [
             "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "google_id": {
+          "name": "google_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'user'"
+        },
+        "email_verified": {
+          "name": "email_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "verification_token": {
+          "name": "verification_token",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verification_expires_at": {
+          "name": "verification_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reset_token": {
+          "name": "reset_token",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reset_expires_at": {
+          "name": "reset_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_user_email": {
+          "name": "idx_user_email",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_user_google_id": {
+          "name": "idx_user_google_id",
+          "columns": [
+            {
+              "expression": "google_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_user_verification_token": {
+          "name": "idx_user_verification_token",
+          "columns": [
+            {
+              "expression": "verification_token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        },
+        "users_google_id_unique": {
+          "name": "users_google_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "google_id"
           ]
         }
       },

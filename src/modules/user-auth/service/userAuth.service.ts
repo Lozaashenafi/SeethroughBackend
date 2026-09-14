@@ -45,7 +45,7 @@ class UserAuthService {
       verificationExpiresAt,
     });
 
-    const token = this.generateToken(user.id, user.email, user.displayName);
+    const token = this.generateToken(user.id, user.email, user.displayName, user.role);
 
     // Send verification email (non-blocking — don't fail registration if email fails)
     sendVerificationEmail(email, verificationToken, displayName).catch((err) => {
@@ -73,7 +73,7 @@ class UserAuthService {
       throw new AppError('This account uses Google Sign-In. Please log in with Google.', 400);
     }
 
-    const token = this.generateToken(user.id, user.email, user.displayName);
+    const token = this.generateToken(user.id, user.email, user.displayName, user.role);
 
     return {
       token,
@@ -81,8 +81,8 @@ class UserAuthService {
         id: user.id,
         email: user.email,
         displayName: user.displayName,
+        role: user.role,
         emailVerified: user.emailVerified,
-        showDisplayName: user.showDisplayName,
         hasPassword: true,
         createdAt: user.createdAt,
       },
@@ -104,15 +104,15 @@ class UserAuthService {
 
     if (user) {
       // Existing Google user — log them in
-      const token = this.generateToken(user.id, user.email, user.displayName);
+      const token = this.generateToken(user.id, user.email, user.displayName, user.role);
       return {
         token,
         user: {
           id: user.id,
           email: user.email,
           displayName: user.displayName,
+          role: user.role,
           emailVerified: user.emailVerified,
-          showDisplayName: user.showDisplayName,
           hasPassword: !!user.passwordHash,
           createdAt: user.createdAt,
         },
@@ -137,6 +137,7 @@ class UserAuthService {
         existingByEmail.id,
         existingByEmail.email,
         existingByEmail.displayName,
+        existingByEmail.role,
       );
       return {
         token,
@@ -144,8 +145,8 @@ class UserAuthService {
           id: existingByEmail.id,
           email: existingByEmail.email,
           displayName: existingByEmail.displayName,
+          role: existingByEmail.role,
           emailVerified: true,
-          showDisplayName: existingByEmail.showDisplayName,
           hasPassword: !!existingByEmail.passwordHash,
           createdAt: existingByEmail.createdAt,
         },
@@ -160,7 +161,7 @@ class UserAuthService {
       emailVerified: googleUser.email_verified,
     });
 
-    const token = this.generateToken(newUser.id, newUser.email, newUser.displayName);
+    const token = this.generateToken(newUser.id, newUser.email, newUser.displayName, newUser.role);
 
     return { token, user: newUser };
   }
@@ -206,12 +207,6 @@ class UserAuthService {
 
     await sendVerificationEmail(user.email, verificationToken, user.displayName);
     console.log('[VERIFY] Email send completed successfully');
-
-    // sendVerificationEmail(user.email, verificationToken, user.displayName).catch(
-    //   (err) => {
-    //     console.error('Failed to send verification email:', err);
-    //   },
-    // );
   }
 
   /**
@@ -286,14 +281,6 @@ class UserAuthService {
   }
 
   /**
-   * Toggle whether the user's display name is shown on their reviews.
-   */
-  async updateShowDisplayName(userId: string, showDisplayName: boolean): Promise<UserProfile> {
-    await userAuthRepository.updateShowDisplayName(userId, showDisplayName);
-    return this.getProfile(userId);
-  }
-
-  /**
    * Update the user's display name.
    */
   async updateDisplayName(userId: string, displayName: string): Promise<UserProfile> {
@@ -342,13 +329,14 @@ class UserAuthService {
     await userAuthRepository.updatePassword(userId, passwordHash);
   }
 
-  private generateToken(userId: string, email: string, displayName: string): string {
+  private generateToken(userId: string, email: string, displayName: string, role: string): string {
     const jti = randomBytes(16).toString('hex');
     const payload: UserJwtPayload = {
       jti,
       userId,
       email,
       displayName,
+      role,
     };
 
     return jwt.sign(payload, env.JWT_SECRET, {

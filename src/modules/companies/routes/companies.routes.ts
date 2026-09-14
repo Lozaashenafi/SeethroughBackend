@@ -1,9 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { companiesController } from '../controller/companies.controller.js';
-import { anonymousIdentity } from '../../../middlewares/anonymousIdentity.middleware.js';
-import { adminAuth } from '../../../middlewares/adminAuth.middleware.js';
-import { temporarilyBlockedGuard } from '../../../middlewares/temporarilyBlockedGuard.middleware.js';
+import { userAuth } from '../../../middlewares/userAuth.middleware.js';
 import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
@@ -21,11 +19,8 @@ import {
 const companiesRoutes = Router();
 
 // Public routes
-// anonymousIdentity() runs before the rate limiter so limits are keyed per
-// identity (not per IP), consistent with the rest of the API.
 companiesRoutes.get(
   '/',
-  anonymousIdentity(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ query: listCompaniesQuerySchema }),
   asyncHandler(companiesController.list.bind(companiesController)),
@@ -34,7 +29,6 @@ companiesRoutes.get(
 // Scrape — must come BEFORE /:slug to prevent Express from matching 'scrape' as a slug
 companiesRoutes.post(
   '/scrape',
-  anonymousIdentity(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ body: scrapeCompanySchema }),
   asyncHandler(companiesController.scrape.bind(companiesController)),
@@ -43,7 +37,6 @@ companiesRoutes.post(
 // Duplicate check — must also come BEFORE /:slug
 companiesRoutes.get(
   '/check',
-  anonymousIdentity(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ query: checkDuplicateQuerySchema }),
   asyncHandler(companiesController.checkDuplicates.bind(companiesController)),
@@ -51,19 +44,15 @@ companiesRoutes.get(
 
 companiesRoutes.get(
   '/:slug',
-  anonymousIdentity(),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ params: companySlugParamsSchema }),
   asyncHandler(companiesController.getBySlug.bind(companiesController)),
 );
 
-// Public — anyone can create a company, but identities under a temporary
-// spam/abuse restriction are blocked (consistent with all other content
-// submission endpoints).
+// Anyone can create a company, but authenticated users only
 companiesRoutes.post(
   '/',
-  anonymousIdentity(),
-  temporarilyBlockedGuard(),
+  userAuth({ required: true }),
   createRateLimiter(RATE_LIMITS.COMPANY_CREATE),
   validate({ body: createCompanySchema }),
   asyncHandler(companiesController.create.bind(companiesController)),
@@ -72,14 +61,14 @@ companiesRoutes.post(
 // Admin-only routes
 companiesRoutes.put(
   '/:slug',
-  adminAuth(),
+  userAuth({ adminOnly: true }),
   validate({ params: companySlugParamsSchema, body: updateCompanySchema }),
   asyncHandler(companiesController.update.bind(companiesController)),
 );
 
 companiesRoutes.delete(
   '/:slug',
-  adminAuth(),
+  userAuth({ adminOnly: true }),
   validate({ params: companySlugParamsSchema }),
   asyncHandler(companiesController.delete.bind(companiesController)),
 );
@@ -92,7 +81,7 @@ const logoUpload = multer({
 
 companiesRoutes.put(
   '/:slug/logo',
-  adminAuth(),
+  userAuth({ adminOnly: true }),
   validate({ params: companySlugParamsSchema }),
   logoUpload.single('file'),
   asyncHandler(companiesController.uploadLogo.bind(companiesController)),

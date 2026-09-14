@@ -5,7 +5,7 @@ import { findBadWords } from '../../../shared/utils/index.js';
 
 class CommentsService {
   async create(input: {
-    anonymousId: string;
+    userId: string;
     reviewPublicId: string;
     content: string;
     parentPublicId?: string;
@@ -41,7 +41,7 @@ class CommentsService {
     }
 
     return commentsRepository.create({
-      anonymousId: input.anonymousId,
+      userId: input.userId,
       reviewId: review.id,
       content: input.content,
       parentId,

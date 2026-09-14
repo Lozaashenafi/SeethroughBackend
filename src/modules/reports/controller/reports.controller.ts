@@ -7,7 +7,7 @@ class ReportsController {
   async create(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const report = await reportsService.create({
       ...req.body,
-      anonymousId: req.anonymous!.id,
+      userId: req.user!.userId,
     });
     sendSuccess(res, toReportResponse(report), 'Report submitted', 201);
   }

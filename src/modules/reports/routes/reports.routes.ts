@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import { reportsController } from '../controller/reports.controller.js';
-import { anonymousIdentity } from '../../../middlewares/anonymousIdentity.middleware.js';
-import { adminAuth } from '../../../middlewares/adminAuth.middleware.js';
-import { temporarilyBlockedGuard } from '../../../middlewares/temporarilyBlockedGuard.middleware.js';
+import { userAuth } from '../../../middlewares/userAuth.middleware.js';
 import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
@@ -11,11 +9,10 @@ import { createReportSchema, listReportsQuerySchema, updateReportStatusSchema, r
 
 const reportsRoutes = Router();
 
-// Public - Anyone can submit a report
+// Anyone can submit a report
 reportsRoutes.post(
   '/',
-  anonymousIdentity(),
-  temporarilyBlockedGuard(),
+  userAuth({ required: true, enforceActive: true }),
   createRateLimiter(RATE_LIMITS.REPORT),
   validate({ body: createReportSchema }),
   asyncHandler(reportsController.create.bind(reportsController)),
@@ -24,7 +21,7 @@ reportsRoutes.post(
 // Admin-only routes
 reportsRoutes.get(
   '/',
-  adminAuth(),
+  userAuth({ adminOnly: true }),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ query: listReportsQuerySchema }),
   asyncHandler(reportsController.list.bind(reportsController)),
@@ -32,7 +29,7 @@ reportsRoutes.get(
 
 reportsRoutes.patch(
   '/:publicId/status',
-  adminAuth(),
+  userAuth({ adminOnly: true }),
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ params: reportPublicIdParamsSchema, body: updateReportStatusSchema }),
   asyncHandler(reportsController.updateStatus.bind(reportsController)),

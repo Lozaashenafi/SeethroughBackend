@@ -13,7 +13,7 @@
 -- Materialize the reviews to remove: every review except the keeper in each
 -- duplicate group. Published is preferred, then pending, then rejected; ties
 -- broken by newest (created_at, then id).
-CREATE TEMP TABLE _review_dedupe_doomed AS
+CREATE TEMP TABLE IF NOT EXISTS _review_dedupe_doomed AS
 WITH ranked AS (
   SELECT
     id,
@@ -47,9 +47,9 @@ DELETE FROM review_tags WHERE review_id IN (SELECT id FROM _review_dedupe_doomed
 -- The duplicates themselves.
 DELETE FROM reviews WHERE id IN (SELECT id FROM _review_dedupe_doomed);
 
-DROP TABLE _review_dedupe_doomed;
+DROP TABLE IF EXISTS _review_dedupe_doomed;
 
 -- From here on the database itself rejects a second review of the same
 -- company by the same identity (service-level check remains as defense in
 -- depth and to give a friendly 409 instead of a raw constraint error).
-CREATE UNIQUE INDEX "idx_review_anonymous_company_unique" ON "reviews" USING btree ("anonymous_id","company_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_review_anonymous_company_unique" ON "reviews" USING btree ("anonymous_id","company_id");

@@ -9,12 +9,15 @@ interface UserRow {
   passwordHash: string | null;
   displayName: string;
   googleId: string | null;
+  role: string;
   emailVerified: boolean;
-  showDisplayName: boolean;
   verificationToken: string | null;
   verificationExpiresAt: Date | null;
   resetToken: string | null;
   resetExpiresAt: Date | null;
+  isBlocked: boolean;
+  blockedAt: Date | null;
+  tempBlockedUntil: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +31,7 @@ export class UserAuthRepository {
     emailVerified?: boolean;
     verificationToken?: string;
     verificationExpiresAt?: Date;
+    role?: 'user' | 'admin';
   }): Promise<UserProfile> {
     const [user] = await db
       .insert(users)
@@ -39,13 +43,14 @@ export class UserAuthRepository {
         emailVerified: input.emailVerified ?? false,
         verificationToken: input.verificationToken ?? null,
         verificationExpiresAt: input.verificationExpiresAt ?? null,
+        role: input.role ?? 'user',
       })
       .returning({
         id: users.id,
         email: users.email,
         displayName: users.displayName,
+        role: users.role,
         emailVerified: users.emailVerified,
-        showDisplayName: users.showDisplayName,
         createdAt: users.createdAt,
       });
 
@@ -53,8 +58,8 @@ export class UserAuthRepository {
       id: user.id,
       email: user.email,
       displayName: user.displayName,
+      role: user.role,
       emailVerified: user.emailVerified,
-      showDisplayName: user.showDisplayName,
       hasPassword: !!input.passwordHash,
       createdAt: user.createdAt,
     };
@@ -176,8 +181,8 @@ export class UserAuthRepository {
         id: users.id,
         email: users.email,
         displayName: users.displayName,
+        role: users.role,
         emailVerified: users.emailVerified,
-        showDisplayName: users.showDisplayName,
         passwordHash: users.passwordHash,
         createdAt: users.createdAt,
       })
@@ -188,8 +193,8 @@ export class UserAuthRepository {
       id: user.id,
       email: user.email,
       displayName: user.displayName,
+      role: user.role,
       emailVerified: user.emailVerified,
-      showDisplayName: user.showDisplayName,
       hasPassword: !!user.passwordHash,
       createdAt: user.createdAt,
     };
@@ -213,19 +218,6 @@ export class UserAuthRepository {
       .where(eq(users.id, id));
   }
 
-  async updateShowDisplayName(
-    id: string,
-    showDisplayName: boolean,
-  ): Promise<void> {
-    await db
-      .update(users)
-      .set({
-        showDisplayName,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, id));
-  }
-
   /**
    * Link a Google account to an existing email/password user.
    * Called when a Google sign-in matches an existing email but has no googleId.
@@ -238,7 +230,7 @@ export class UserAuthRepository {
       .update(users)
       .set({
         googleId,
-        emailVerified: true, // Google already verified the email
+        emailVerified: true,
         updatedAt: new Date(),
       })
       .where(eq(users.id, id));
