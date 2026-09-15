@@ -37,26 +37,6 @@ class UserAuthController {
     sendSuccess(res, { user: result.user }, 'Logged in successfully');
   }
 
-  async adminLogin(req: Request, res: Response, _next: NextFunction): Promise<void> {
-    const { email, password } = req.body;
-    const result = await userAuthService.login(email, password);
-
-    if (result.user.role !== 'admin') {
-      sendError(res, 'Admin access required', 403);
-      return;
-    }
-
-    res.cookie(USER_TOKEN_COOKIE, result.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
-
-    sendSuccess(res, { user: result.user }, 'Admin login successful');
-  }
-
   async googleCallback(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { idToken } = req.body;
 

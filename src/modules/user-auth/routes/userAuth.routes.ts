@@ -70,13 +70,6 @@ userAuthRoutes.post(
 );
 
 userAuthRoutes.post(
-  '/admin/login',
-  loginLimiter,
-  validate({ body: loginSchema }),
-  asyncHandler(userAuthController.adminLogin.bind(userAuthController)),
-);
-
-userAuthRoutes.post(
   '/google',
   validate({ body: googleCallbackSchema }),
   asyncHandler(userAuthController.googleCallback.bind(userAuthController)),
