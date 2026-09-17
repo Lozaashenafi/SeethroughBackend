@@ -17,6 +17,7 @@ export interface CreateReviewInput {
 
 export interface ReviewResponse {
   publicId: string;
+  userId: string;
   companyId: string;
   companyName: string | null;
   companySlug: string | null;
@@ -40,8 +41,14 @@ export interface ReviewResponse {
   updatedAt: Date;
 }
 
+export interface AdminReviewResponse extends ReviewResponse {
+  authorEmail: string;
+  authorDisplayName: string;
+}
+
 export function toReviewResponse(review: {
   publicId: string;
+  userId: string;
   companyId: string;
   companyName: string | null;
   companySlug: string | null;
@@ -66,6 +73,7 @@ export function toReviewResponse(review: {
 }): ReviewResponse {
   return {
     publicId: review.publicId,
+    userId: review.userId,
     companyId: review.companyId,
     companyName: review.companyName,
     companySlug: review.companySlug,
@@ -87,5 +95,39 @@ export function toReviewResponse(review: {
     unhelpfulCount: review.unhelpfulCount,
     createdAt: review.createdAt,
     updatedAt: review.updatedAt,
+  };
+}
+
+export function toAdminReviewResponse(review: {
+  publicId: string;
+  userId: string;
+  companyId: string;
+  companyName: string | null;
+  companySlug: string | null;
+  title: string;
+  pros: string | null;
+  cons: string | null;
+  overallRating: number | null;
+  workLifeBalance: number | null;
+  culture: number | null;
+  management: number | null;
+  compensation: number | null;
+  opportunities: number | null;
+  isCurrentEmployee: boolean | null;
+  employmentStatus: string | null;
+  jobTitle: string | null;
+  isVerified: boolean;
+  status: 'published' | 'pending' | 'rejected';
+  helpfulCount: number;
+  unhelpfulCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+  authorEmail: string;
+  authorDisplayName: string;
+}): AdminReviewResponse {
+  return {
+    ...toReviewResponse(review),
+    authorEmail: review.authorEmail,
+    authorDisplayName: review.authorDisplayName,
   };
 }

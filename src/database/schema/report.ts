@@ -6,6 +6,7 @@ import {
   timestamp,
   integer,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { reviews } from './review.js';
 import { comments } from './comment.js';
@@ -35,5 +36,7 @@ export const reports = pgTable(
     reviewIdx: index('idx_report_review').on(table.reviewId),
     commentIdx: index('idx_report_comment').on(table.commentId),
     statusIdx: index('idx_report_status').on(table.status),
+    userReviewUnique: uniqueIndex('idx_report_user_review').on(table.userId, table.reviewId),
+    userCommentUnique: uniqueIndex('idx_report_user_comment').on(table.userId, table.commentId),
   }),
 );

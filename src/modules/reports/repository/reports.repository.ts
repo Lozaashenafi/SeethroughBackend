@@ -153,6 +153,22 @@ export class ReportsRepository {
     return { data, total: totalResult?.total ?? 0 };
   }
 
+  async findByUserAndReview(userId: string, reviewId: number): Promise<ReportRow | null> {
+    const [report] = await db
+      .select()
+      .from(reports)
+      .where(and(eq(reports.userId, userId), eq(reports.reviewId, reviewId)));
+    return report ?? null;
+  }
+
+  async findByUserAndComment(userId: string, commentId: number): Promise<ReportRow | null> {
+    const [report] = await db
+      .select()
+      .from(reports)
+      .where(and(eq(reports.userId, userId), eq(reports.commentId, commentId)));
+    return report ?? null;
+  }
+
   async findByPublicId(publicId: string): Promise<ReportRow | null> {
     const [report] = await db
       .select()

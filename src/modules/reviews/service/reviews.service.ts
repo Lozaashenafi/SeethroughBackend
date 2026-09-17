@@ -270,7 +270,7 @@ class ReviewsService {
   }
 
   async adminGetByPublicId(publicId: string) {
-    const review = await reviewsRepository.findByPublicId(publicId);
+    const review = await reviewsRepository.findAdminByPublicId(publicId);
     if (!review) {
       throw new AppError('Review not found', 404);
     }

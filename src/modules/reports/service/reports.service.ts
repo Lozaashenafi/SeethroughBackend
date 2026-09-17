@@ -38,6 +38,20 @@ class ReportsService {
       throw new AppError('Either reviewPublicId or commentPublicId must be provided', 400);
     }
 
+    // One report per user per review/comment
+    if (reviewId) {
+      const existing = await reportsRepository.findByUserAndReview(input.userId, reviewId);
+      if (existing) {
+        throw new AppError('You have already reported this review', 409);
+      }
+    }
+    if (commentId) {
+      const existing = await reportsRepository.findByUserAndComment(input.userId, commentId);
+      if (existing) {
+        throw new AppError('You have already reported this comment', 409);
+      }
+    }
+
     // Profanity gate — keep report descriptions civil too.
     const badWords = findBadWords(input.description ?? '');
     if (badWords.length > 0) {

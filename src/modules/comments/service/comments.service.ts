@@ -26,6 +26,11 @@ class CommentsService {
       throw new AppError('Review not found', 404);
     }
 
+    // Users cannot comment on their own review
+    if (review.userId === input.userId) {
+      throw new AppError('You cannot comment on your own review', 403);
+    }
+
     // If a parent is referenced, resolve its publicId to the internal DB id
     // and verify it exists and belongs to the same review.
     let parentId: number | undefined;

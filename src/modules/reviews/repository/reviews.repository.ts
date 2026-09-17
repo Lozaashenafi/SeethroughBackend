@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import { db, type DatabaseTx } from '../../../database/db.js';
 import { reviews } from '../../../database/schema/review.js';
 import { companies } from '../../../database/schema/company.js';
+import { users } from '../../../database/schema/user.js';
 import { reviewTags } from '../../../database/schema/reviewTag.js';
 import { comments } from '../../../database/schema/comment.js';
 import { reviewVotes } from '../../../database/schema/reviewVote.js';
@@ -72,6 +73,17 @@ interface ReviewRow {
   updatedAt: Date;
 }
 
+const adminReviewColumns = {
+  ...reviewColumns,
+  authorEmail: users.email,
+  authorDisplayName: users.displayName,
+};
+
+interface AdminReviewRow extends ReviewRow {
+  authorEmail: string;
+  authorDisplayName: string;
+}
+
 export class ReviewsRepository {
   async create(input: CreateReviewRecord): Promise<ReviewRow> {
     return this.createWithClient(db, input);
@@ -119,6 +131,16 @@ export class ReviewsRepository {
 
   async findByPublicId(publicId: string): Promise<ReviewRow | null> {
     return this.findByPublicIdWithClient(db, publicId);
+  }
+
+  async findAdminByPublicId(publicId: string): Promise<AdminReviewRow | null> {
+    const [review] = await db
+      .select(adminReviewColumns)
+      .from(reviews)
+      .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .innerJoin(users, eq(reviews.userId, users.id))
+      .where(eq(reviews.publicId, publicId));
+    return review ?? null;
   }
 
   async findByPublicIdWithClient(client: DbClient, publicId: string): Promise<ReviewRow | null> {
@@ -361,7 +383,7 @@ export class ReviewsRepository {
 
   async findAllWithStatus(
     params: { page: number; limit: number; status?: string; sortBy?: string },
-  ): Promise<{ data: ReviewRow[]; total: number }> {
+  ): Promise<{ data: AdminReviewRow[]; total: number }> {
     const offset = (params.page - 1) * params.limit;
 
     const orderBy = params.sortBy === 'engagement'
@@ -375,9 +397,10 @@ export class ReviewsRepository {
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     const data = await db
-      .select(reviewColumns)
+      .select(adminReviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
+      .innerJoin(users, eq(reviews.userId, users.id))
       .where(whereClause)
       .orderBy(orderBy)
       .limit(params.limit)

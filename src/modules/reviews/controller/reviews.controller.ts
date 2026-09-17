@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../../../shared/responses/index.js';
 import { reviewsService } from '../service/reviews.service.js';
-import { toReviewResponse } from '../types/reviews.types.js';
+import { toReviewResponse, toAdminReviewResponse } from '../types/reviews.types.js';
 
 class ReviewsController {
   async create(req: Request, res: Response, _next: NextFunction): Promise<void> {
@@ -33,7 +33,7 @@ class ReviewsController {
   async adminGetByPublicId(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { publicId } = req.params;
     const review = await reviewsService.adminGetByPublicId(publicId);
-    sendSuccess(res, toReviewResponse(review), 'Review retrieved');
+    sendSuccess(res, toAdminReviewResponse(review), 'Review retrieved');
   }
 
   async listByCompany(req: Request, res: Response, _next: NextFunction): Promise<void> {
@@ -84,7 +84,7 @@ class ReviewsController {
     sendSuccess(
       res,
       {
-        reviews: result.data.map(toReviewResponse),
+        reviews: result.data.map(toAdminReviewResponse),
         pagination: {
           total: result.total,
           page,

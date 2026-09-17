@@ -3,6 +3,9 @@ import { OAuth2Client } from 'google-auth-library';
 import { sendSuccess, sendError } from '../../../shared/responses/index.js';
 import { userAuthService } from '../service/userAuth.service.js';
 import { toUserProfile } from '../types/userAuth.types.js';
+import { reviewsRepository } from '../../reviews/repository/reviews.repository.js';
+import { toReviewResponse } from '../../reviews/types/reviews.types.js';
+import { AppError } from '../../../shared/errors/AppError.js';
 import { env } from '../../../config/env.js';
 import { USER_TOKEN_COOKIE } from '../../../shared/constants/index.js';
 
@@ -150,6 +153,34 @@ class UserAuthController {
     const { password } = req.body;
     await userAuthService.setPassword(req.user!.userId, password);
     sendSuccess(res, null, 'Password set successfully');
+  }
+
+  async getMyReviews(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
+    const result = await reviewsRepository.findByUserId(req.user!.userId, { page, limit });
+    sendSuccess(
+      res,
+      {
+        reviews: result.data.map(toReviewResponse),
+        pagination: {
+          total: result.total,
+          page,
+          limit,
+          totalPages: Math.ceil(result.total / limit),
+        },
+      },
+      'Your reviews retrieved',
+    );
+  }
+
+  async getMyReview(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const review = await reviewsRepository.findByPublicId(publicId);
+    if (!review || review.userId !== req.user!.userId) {
+      throw new AppError('Review not found', 404);
+    }
+    sendSuccess(res, toReviewResponse(review), 'Review retrieved');
   }
 
   async logout(req: Request, res: Response, _next: NextFunction): Promise<void> {

@@ -130,6 +130,18 @@ userAuthRoutes.get(
   asyncHandler(userAuthController.me.bind(userAuthController)),
 );
 
+userAuthRoutes.get(
+  '/me/reviews',
+  userAuth(),
+  asyncHandler(userAuthController.getMyReviews.bind(userAuthController)),
+);
+
+userAuthRoutes.get(
+  '/me/reviews/:publicId',
+  userAuth(),
+  asyncHandler(userAuthController.getMyReview.bind(userAuthController)),
+);
+
 userAuthRoutes.post(
   '/logout',
   userAuth(),
