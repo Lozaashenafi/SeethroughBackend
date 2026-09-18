@@ -1,5 +1,6 @@
 import { commentsRepository } from '../repository/comments.repository.js';
 import { reviewsRepository } from '../../reviews/repository/reviews.repository.js';
+import { notificationsService } from '../../notifications/service/notifications.service.js';
 import { AppError } from '../../../shared/errors/AppError.js';
 import { findBadWords } from '../../../shared/utils/index.js';
 
@@ -45,13 +46,25 @@ class CommentsService {
       parentId = parentComment.id;
     }
 
-    return commentsRepository.create({
+    const comment = await commentsRepository.create({
       userId: input.userId,
       reviewId: review.id,
       content: input.content,
       parentId,
       parentPublicId: input.parentPublicId,
     });
+
+    // Notify the review author (don't notify yourself)
+    if (review.userId !== input.userId) {
+      notificationsService.create({
+        userId: review.userId,
+        type: 'comment',
+        reviewPublicId: input.reviewPublicId,
+        message: 'Someone commented on your review',
+      });
+    }
+
+    return comment;
   }
 
   async listByReview(reviewPublicId: string, page: number, limit: number) {

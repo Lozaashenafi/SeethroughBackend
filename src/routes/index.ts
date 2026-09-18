@@ -10,6 +10,7 @@ import { tagsRoutes } from '../modules/tags/routes/tags.routes.js';
 import { userAuthRoutes } from '../modules/user-auth/routes/userAuth.routes.js';
 import { adminUsersRoutes } from '../modules/user-auth/routes/adminUsers.routes.js';
 import { uploadsRoutes } from '../modules/uploads/routes/uploads.routes.js';
+import { notificationsRoutes } from '../modules/notifications/routes/notifications.routes.js';
 import { API_PREFIX } from '../shared/constants/index.js';
 
 const router = Router();
@@ -22,6 +23,7 @@ router.use(`${API_PREFIX}/votes`, votesRoutes);
 router.use(`${API_PREFIX}/reports`, reportsRoutes);
 router.use(`${API_PREFIX}/industries`, industriesRoutes);
 router.use(`${API_PREFIX}/tags`, tagsRoutes);
+router.use(`${API_PREFIX}/notifications`, notificationsRoutes);
 // Admin user management is mounted before /user so it never falls through to
 // the auth router.
 router.use(`${API_PREFIX}/user/admin/users`, adminUsersRoutes);

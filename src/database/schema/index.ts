@@ -1,6 +1,7 @@
 export * from './comment.js';
 export * from './company.js';
 export * from './industry.js';
+export * from './notification.js';
 export * from './report.js';
 export * from './review.js';
 export * from './reviewTag.js';

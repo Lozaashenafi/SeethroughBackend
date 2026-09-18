@@ -1,6 +1,7 @@
 import { db } from '../../../database/db.js';
 import { votesRepository } from '../repository/votes.repository.js';
 import { reviewsRepository } from '../../reviews/repository/reviews.repository.js';
+import { notificationsService } from '../../notifications/service/notifications.service.js';
 import { AppError } from '../../../shared/errors/AppError.js';
 
 class VotesService {
@@ -32,6 +33,16 @@ class VotesService {
 
       return vote;
     });
+
+    // Notify the review author on helpful votes (don't notify yourself)
+    if (input.voteType === 'helpful' && review.userId !== input.userId) {
+      notificationsService.create({
+        userId: review.userId,
+        type: 'like',
+        reviewPublicId: input.reviewPublicId,
+        message: 'Someone found your review helpful',
+      });
+    }
 
     return result;
   }
