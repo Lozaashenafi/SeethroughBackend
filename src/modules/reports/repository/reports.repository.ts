@@ -188,6 +188,14 @@ export class ReportsRepository {
       .returning();
     return report;
   }
+
+  async countResolvedByReviewId(reviewId: number): Promise<number> {
+    const [result] = await db
+      .select({ total: count() })
+      .from(reports)
+      .where(and(eq(reports.reviewId, reviewId), eq(reports.status, 'resolved')));
+    return result?.total ?? 0;
+  }
 }
 
 export const reportsRepository = new ReportsRepository();

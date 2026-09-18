@@ -1,9 +1,15 @@
 import { reportsRepository } from '../repository/reports.repository.js';
 import { reviewsRepository } from '../../reviews/repository/reviews.repository.js';
 import { commentsRepository } from '../../comments/repository/comments.repository.js';
+import { companiesRepository } from '../../companies/repository/companies.repository.js';
+import { adminUsersRepository } from '../../user-auth/repository/adminUsers.repository.js';
+import { db } from '../../../database/db.js';
 import { AppError } from '../../../shared/errors/AppError.js';
 import { findBadWords } from '../../../shared/utils/index.js';
 import type { ReportStatus } from '../types/reports.types.js';
+
+const REPORT_THRESHOLD = 10;
+const BAN_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 1 month
 
 class ReportsService {
   async create(input: {
@@ -83,7 +89,29 @@ class ReportsService {
     if (!report) {
       throw new AppError('Report not found', 404);
     }
-    return reportsRepository.updateStatus(report.id, status);
+    const updated = await reportsRepository.updateStatus(report.id, status);
+
+    // Auto-enforce: if a review report is approved and reaches 10 resolved
+    // reports, delete the review and temp-ban the author for 1 month.
+    if (status === 'resolved' && report.reviewId) {
+      const resolvedCount = await reportsRepository.countResolvedByReviewId(report.reviewId);
+      if (resolvedCount >= REPORT_THRESHOLD) {
+        const review = await reviewsRepository.findById(report.reviewId);
+        if (review) {
+          await db.transaction(async (tx) => {
+            await reviewsRepository.deleteByPublicIdWithClient(tx, review.publicId);
+            const stats = await reviewsRepository.getCompanyReviewStatsWithClient(tx, review.companyId);
+            await companiesRepository.updateStatsWithClient(tx, review.companyId, stats);
+          });
+          await adminUsersRepository.setTempBlocked(
+            review.userId,
+            new Date(Date.now() + BAN_DURATION_MS),
+          );
+        }
+      }
+    }
+
+    return updated;
   }
 }
 
