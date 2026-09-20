@@ -14,8 +14,8 @@ class CommentsController {
 
   async listByReview(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { reviewPublicId } = req.params;
-    const page = Number(req.query.page);
-    const limit = Number(req.query.limit);
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
 
     const result = await commentsService.listByReview(reviewPublicId, page, limit);
     sendSuccess(

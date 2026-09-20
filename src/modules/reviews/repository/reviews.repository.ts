@@ -335,6 +335,8 @@ export class ReviewsRepository {
       isCurrentEmployee: boolean | null;
       employmentStatus: string | null;
       jobTitle: string | null;
+      showName: boolean;
+      reviewerName: string | null;
       status: 'published' | 'pending' | 'rejected';
       contentFingerprint: string;
     }>,
