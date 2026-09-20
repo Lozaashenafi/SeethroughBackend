@@ -13,6 +13,7 @@ export interface CreateReviewInput {
   employmentStatus?: 'full-time' | 'part-time' | 'contract' | 'intern' | 'freelance';
   jobTitle?: string;
   tagIds?: number[];
+  showName?: boolean;
 }
 
 export interface ReviewResponse {
@@ -34,6 +35,8 @@ export interface ReviewResponse {
   employmentStatus: string | null;
   jobTitle: string | null;
   isVerified: boolean;
+  showName: boolean;
+  reviewerName: string | null;
   status: 'published' | 'pending' | 'rejected';
   helpfulCount: number;
   unhelpfulCount: number;
@@ -65,6 +68,8 @@ export function toReviewResponse(review: {
   employmentStatus: string | null;
   jobTitle: string | null;
   isVerified: boolean;
+  showName: boolean;
+  reviewerName: string | null;
   status: 'published' | 'pending' | 'rejected';
   helpfulCount: number;
   unhelpfulCount: number;
@@ -90,6 +95,8 @@ export function toReviewResponse(review: {
     employmentStatus: review.employmentStatus,
     jobTitle: review.jobTitle,
     isVerified: review.isVerified,
+    showName: review.showName,
+    reviewerName: review.reviewerName,
     status: review.status,
     helpfulCount: review.helpfulCount,
     unhelpfulCount: review.unhelpfulCount,
@@ -117,6 +124,8 @@ export function toAdminReviewResponse(review: {
   employmentStatus: string | null;
   jobTitle: string | null;
   isVerified: boolean;
+  showName: boolean;
+  reviewerName: string | null;
   status: 'published' | 'pending' | 'rejected';
   helpfulCount: number;
   unhelpfulCount: number;

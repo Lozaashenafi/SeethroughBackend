@@ -116,7 +116,7 @@ pnpm install
 cp .env.example .env
 
 # Edit .env with your database credentials
-# DATABASE_URL=postgresql://postgres:postgres@localhost:5432/seethroght
+# DATABASE_URL=postgresql://postgres:postgres@localhost:5432/seethrough
 
 # Generate and run migrations
 pnpm db:generate

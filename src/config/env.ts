@@ -14,7 +14,7 @@ const envSchema = z.object({
   // cross-origin login/admin calls will be rejected.
   CORS_ORIGIN: z
     .string()
-    .default('http://localhost:5173,https://seethroght.vercel.app'),
+    .default('http://localhost:5173,https://seethrough.pro.et'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   JWT_SECRET: z.string().optional(),
   // Number of proxies to trust for req.ip (Express trust proxy).

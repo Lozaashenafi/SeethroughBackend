@@ -16,6 +16,7 @@ export const createReviewSchema = z.object({
   employmentStatus: z.enum(['full-time', 'part-time', 'contract', 'intern', 'freelance']).optional(),
   jobTitle: sanitizedString(undefined, 100).optional(),
   tagIds: z.array(z.number().int().positive()).max(10).optional(),
+  showName: z.boolean().optional(),
 });
 
 export const reviewPublicIdParamsSchema = z.object({
@@ -40,6 +41,7 @@ export const updateReviewSchema = z.object({
     .optional(),
   jobTitle: sanitizedString(undefined, 100).optional(),
   tagIds: z.array(z.number().int().positive()).max(10).optional(),
+  showName: z.boolean().optional(),
 });
 
 export const listReviewsQuerySchema = z.object({

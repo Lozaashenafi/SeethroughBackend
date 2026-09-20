@@ -39,6 +39,8 @@ const reviewColumns = {
   employmentStatus: reviews.employmentStatus,
   jobTitle: reviews.jobTitle,
   isVerified: reviews.isVerified,
+  showName: reviews.showName,
+  reviewerName: reviews.reviewerName,
   status: reviews.status,
   helpfulCount: reviews.helpfulCount,
   unhelpfulCount: reviews.unhelpfulCount,
@@ -66,6 +68,8 @@ interface ReviewRow {
   employmentStatus: string | null;
   jobTitle: string | null;
   isVerified: boolean;
+  showName: boolean;
+  reviewerName: string | null;
   status: 'published' | 'pending' | 'rejected';
   helpfulCount: number;
   unhelpfulCount: number;
@@ -92,6 +96,17 @@ export class ReviewsRepository {
   async createWithClient(client: DbClient, input: CreateReviewRecord): Promise<ReviewRow> {
     const publicId = nanoid(16);
 
+    // If showName is true, look up the user's display name to store on the review
+    let reviewerName: string | null = null;
+    if (input.showName) {
+      const [user] = await client
+        .select({ displayName: users.displayName })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      reviewerName = user?.displayName ?? null;
+    }
+
     const [review] = await client
       .insert(reviews)
       .values({
@@ -111,6 +126,8 @@ export class ReviewsRepository {
         employmentStatus: input.employmentStatus ?? null,
         jobTitle: input.jobTitle ?? null,
         contentFingerprint: input.contentFingerprint,
+        showName: input.showName ?? false,
+        reviewerName,
         status: input.status,
       })
       .returning();
