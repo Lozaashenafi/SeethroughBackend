@@ -15,6 +15,19 @@ import { API_PREFIX } from '../shared/constants/index.js';
 
 const router = Router();
 
+// Convenience root response — without it, GET / on the backend domain 404s
+// (uptime monitors and casual browser checks hit / first and the 404 makes
+// the API look down even when it is healthy).
+router.get('/', (_req, res) => {
+  res.json({
+    success: true,
+    message: 'See Through API',
+    data: { health: `${API_PREFIX}/health`, version: '0.1.0' },
+  });
+});
+
+// Alias /health to the same handler so both /health and /api/v1/health work.
+router.use('/health', healthRoutes);
 router.use(`${API_PREFIX}/health`, healthRoutes);
 router.use(`${API_PREFIX}/companies`, companiesRoutes);
 router.use(`${API_PREFIX}/reviews`, reviewsRoutes);
