@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // it strips the "/api" prefix (e.g. /api/v1/health arrives as /v1/health),
   // while non-API paths (/, /health) arrive unchanged. The previous logic
   // blindly prepended "/api" to everything, which turned "/" into "/api/" and
-  "/health" into "/api/health" — paths no Express route matches, so the root
+  // "/health" into "/api/health" — paths no Express route matches, so the root
   // index and health alias always 404'd. Normalize precisely instead:
   //
   //   /v1/*         -> /api/v1/*   (restore the stripped prefix)

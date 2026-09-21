@@ -10,7 +10,7 @@
     "start": "node dist/server.js",
     "lint": "eslint src/",
     "format": "prettier --write \"src/**/*.ts\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.api.json --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
