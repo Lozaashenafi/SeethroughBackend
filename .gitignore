@@ -7,3 +7,8 @@ dist/
 *.log
 .vercel
 .env*
+
+# Compiled artifacts of api/index.ts — Vercel compiles the .ts itself, and a
+# committed .js conflicts with it at deploy time ("conflicting paths" error).
+api/**/*.js
+api/**/*.js.map
