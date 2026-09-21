@@ -1,1 +1,0 @@
-ALTER TABLE "users" ADD COLUMN "show_display_name" boolean DEFAULT false NOT NULL;

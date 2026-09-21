@@ -1,1 +1,0 @@
-ALTER TABLE "reviews" ADD COLUMN "content_fingerprint" text;

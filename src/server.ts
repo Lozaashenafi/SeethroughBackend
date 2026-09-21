@@ -1,8 +1,8 @@
 import { app } from './app/app.js';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
-import { db, testConnection, closePool } from './database/db.js';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { testConnection, closePool } from './database/db.js';
+import { runBootMigrations } from './database/migrate-on-boot.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Server } from 'node:http';
@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   // anonymous_identities/reviews after a deploy.
   if (dbConnected && env.NODE_ENV !== 'test') {
     try {
-      await migrate(db, { migrationsFolder });
+      await runBootMigrations(migrationsFolder);
       logger.info('Database migrations applied');
     } catch (error) {
       logger.error(

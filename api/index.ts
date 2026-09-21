@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { app } from '../src/app/app.js'; 
-import { db, testConnection } from '../src/database/db.js'; 
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { testConnection } from '../src/database/db.js'; 
+import { runBootMigrations } from '../src/database/migrate-on-boot.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,7 +18,8 @@ async function ensureReady() {
   const dbConnected = await testConnection();
   if (dbConnected) {
     try {
-      await migrate(db, { migrationsFolder });
+      await runBootMigrations(migrationsFolder);
+      console.log('Boot migrations completed');
     } catch (error) {
       console.error('Migration failed:', error);
     }

@@ -15,6 +15,13 @@
       "when": 1789409651452,
       "tag": "0001_tiresome_bromley",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789974765240,
+      "tag": "0002_notifications",
+      "breakpoints": true
     }
   ]
 }
