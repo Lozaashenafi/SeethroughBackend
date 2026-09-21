@@ -7,25 +7,25 @@ const notificationsRoutes = Router();
 
 notificationsRoutes.get(
   '/',
-  userAuth(),
+  userAuth({ required: true }),
   asyncHandler(notificationsController.list.bind(notificationsController)),
 );
 
 notificationsRoutes.get(
   '/unread-count',
-  userAuth(),
+  userAuth({ required: true }),
   asyncHandler(notificationsController.unreadCount.bind(notificationsController)),
 );
 
 notificationsRoutes.patch(
   '/:id/read',
-  userAuth(),
+  userAuth({ required: true }),
   asyncHandler(notificationsController.markAsRead.bind(notificationsController)),
 );
 
 notificationsRoutes.patch(
   '/read-all',
-  userAuth(),
+  userAuth({ required: true }),
   asyncHandler(notificationsController.markAllAsRead.bind(notificationsController)),
 );
 

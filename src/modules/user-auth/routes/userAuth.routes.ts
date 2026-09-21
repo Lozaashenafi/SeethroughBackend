@@ -98,27 +98,27 @@ userAuthRoutes.post(
 userAuthRoutes.post(
   '/resend-verification',
   registerLimiter,
-  userAuth(),
+  userAuth({ required: true }),
   asyncHandler(userAuthController.resendVerification.bind(userAuthController)),
 );
 
 userAuthRoutes.patch(
   '/display-name',
-  userAuth(),
+  userAuth({ required: true }),
   validate({ body: updateDisplayNameSchema }),
   asyncHandler(userAuthController.updateDisplayName.bind(userAuthController)),
 );
 
 userAuthRoutes.patch(
   '/change-password',
-  userAuth(),
+  userAuth({ required: true }),
   validate({ body: changePasswordSchema }),
   asyncHandler(userAuthController.changePassword.bind(userAuthController)),
 );
 
 userAuthRoutes.patch(
   '/set-password',
-  userAuth(),
+  userAuth({ required: true }),
   validate({ body: setPasswordSchema }),
   asyncHandler(userAuthController.setPassword.bind(userAuthController)),
 );
@@ -126,25 +126,25 @@ userAuthRoutes.patch(
 // Protected routes
 userAuthRoutes.get(
   '/me',
-  userAuth(),
+  userAuth({ required: true }),
   asyncHandler(userAuthController.me.bind(userAuthController)),
 );
 
 userAuthRoutes.get(
   '/me/reviews',
-  userAuth(),
+  userAuth({ required: true }),
   asyncHandler(userAuthController.getMyReviews.bind(userAuthController)),
 );
 
 userAuthRoutes.get(
   '/me/reviews/:publicId',
-  userAuth(),
+  userAuth({ required: true }),
   asyncHandler(userAuthController.getMyReview.bind(userAuthController)),
 );
 
 userAuthRoutes.post(
   '/logout',
-  userAuth(),
+  userAuth({ required: true }),
   asyncHandler(userAuthController.logout.bind(userAuthController)),
 );
 
