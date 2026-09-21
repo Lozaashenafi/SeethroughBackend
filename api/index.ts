@@ -31,11 +31,24 @@ async function ensureReady() {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await ensureReady();
 
-  // Vercel strips the "/api" prefix from req.url before invoking the handler,
-  // but Express routes are mounted at "/api/v1/...". Restore the prefix so
-  // route matching works correctly.
-  if (!req.url.startsWith('/api')) {
-    req.url = '/api' + req.url;
+  // Vercel's rewrites deliver ALL paths to this handler. For /api/* requests
+  // it strips the "/api" prefix (e.g. /api/v1/health arrives as /v1/health),
+  // while non-API paths (/, /health) arrive unchanged. The previous logic
+  // blindly prepended "/api" to everything, which turned "/" into "/api/" and
+  "/health" into "/api/health" — paths no Express route matches, so the root
+  // index and health alias always 404'd. Normalize precisely instead:
+  //
+  //   /v1/*         -> /api/v1/*   (restore the stripped prefix)
+  //   /, ""         -> /           (root API index)
+  //   /health       -> /health     (health alias, same controller as /api/v1/health)
+  //   anything else -> unchanged   (falls through to Express' 404 handler)
+  const incoming = req.url ?? '/';
+  if (incoming.startsWith('/v1/') || incoming === '/v1') {
+    req.url = '/api' + incoming;
+  } else if (incoming === '' || incoming === '/api') {
+    req.url = '/';
+  } else {
+    req.url = incoming || '/';
   }
 
   return app(req, res);
