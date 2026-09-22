@@ -37,8 +37,6 @@ export const reviews = pgTable(
     jobTitle: text('job_title'),
     isVerified: boolean('is_verified').default(false).notNull(),
     contentFingerprint: text('content_fingerprint'),
-    showName: boolean('show_name').default(false).notNull(),
-    reviewerName: text('reviewer_name'),
     status: text('status', { enum: ['published', 'pending', 'rejected'] })
       .default('published')
       .notNull(),

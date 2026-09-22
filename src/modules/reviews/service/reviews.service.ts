@@ -1,5 +1,6 @@
 import { reviewsRepository } from '../repository/reviews.repository.js';
 import { companiesRepository } from '../../companies/repository/companies.repository.js';
+import { adminUsersRepository } from '../../user-auth/repository/adminUsers.repository.js';
 import { AppError } from '../../../shared/errors/AppError.js';
 import {
   contentFingerprint,
@@ -270,7 +271,9 @@ class ReviewsService {
   }
 
   async adminGetByPublicId(publicId: string) {
-    const review = await reviewsRepository.findAdminByPublicId(publicId);
+    // Admins see the same anonymous payload as everyone else — by design,
+    // reviews carry no reviewer identity in the API at all.
+    const review = await reviewsRepository.findByPublicId(publicId);
     if (!review) {
       throw new AppError('Review not found', 404);
     }
@@ -312,6 +315,19 @@ class ReviewsService {
     // Admin callers pass an explicit status (or 'all') via the admin endpoint.
     const status = params.status ?? 'published';
     return reviewsRepository.findAllWithStatus({ ...params, status });
+  }
+
+  /**
+   * Ban the author of a review without revealing who it is. The admin only
+   * ever supplies the review's publicId; the server resolves the author
+   * internally and never returns their identity.
+   */
+  async banAuthor(publicId: string): Promise<{ banned: boolean }> {
+    const review = await reviewsRepository.findByPublicId(publicId);
+    if (!review) {
+      throw new AppError('Review not found', 404);
+    }
+    return adminUsersRepository.blockAuthorOfReview(publicId);
   }
 
   async moderate(publicId: string, status: 'published' | 'rejected') {

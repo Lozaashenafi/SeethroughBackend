@@ -9,11 +9,12 @@ import { createReportSchema, listReportsQuerySchema, updateReportStatusSchema, r
 
 const reportsRoutes = Router();
 
-// Anyone can submit a report
+// Reports require a logged-in, non-blocked user. Same dual budget pattern.
 reportsRoutes.post(
   '/',
   userAuth({ required: true, enforceActive: true }),
-  createRateLimiter(RATE_LIMITS.REPORT),
+  createRateLimiter(RATE_LIMITS.REPORT, { scope: 'user' }),
+  createRateLimiter(RATE_LIMITS.REPORT_IP),
   validate({ body: createReportSchema }),
   asyncHandler(reportsController.create.bind(reportsController)),
 );

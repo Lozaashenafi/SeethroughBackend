@@ -124,6 +124,35 @@ export class AdminUsersRepository {
    * Block or unblock an account. Unblocking also clears any temp-block window,
    * so "unblock" always leaves the user fully able to post again.
    */
+  /**
+   * Blind ban: resolve the author of a review and block them without ever
+   * returning any identity. The caller only learns whether a ban was applied.
+   * Admins can already list every account (with emails) in the admin UI, so
+   * the server learning the id is not a new exposure — but this endpoint
+   * deliberately never echoes it back, and there is no route that maps a
+   * review to its author.
+   */
+  async blockAuthorOfReview(reviewPublicId: string): Promise<{ banned: boolean }> {
+    const [review] = await db
+      .select({ userId: reviews.userId })
+      .from(reviews)
+      .where(eq(reviews.publicId, reviewPublicId))
+      .limit(1);
+    if (!review) return { banned: false };
+
+    const [user] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, review.userId))
+      .limit(1);
+    // Never ban an admin account — banning a co-admin from the review UI
+    // would lock the whole admin panel.
+    if (!user || user.role === 'admin') return { banned: false };
+
+    await this.setBlocked(user.id, true);
+    return { banned: true };
+  }
+
   async setBlocked(id: string, blocked: boolean): Promise<AdminUserRow | null> {
     const [user] = await db
       .update(users)

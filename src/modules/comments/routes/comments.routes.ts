@@ -17,11 +17,13 @@ commentsRoutes.get(
   asyncHandler(commentsController.listByReview.bind(commentsController)),
 );
 
-// Posting comments requires authenticated user
+// Posting comments requires authenticated user. Same dual budget as reviews:
+// account-scoped plus IP-scoped.
 commentsRoutes.post(
   '/',
   userAuth({ required: true, enforceActive: true }),
-  createRateLimiter(RATE_LIMITS.COMMENT_CREATE),
+  createRateLimiter(RATE_LIMITS.COMMENT_CREATE, { scope: 'user' }),
+  createRateLimiter(RATE_LIMITS.COMMENT_CREATE_IP),
   validate({ body: createCommentSchema }),
   asyncHandler(commentsController.create.bind(commentsController)),
 );

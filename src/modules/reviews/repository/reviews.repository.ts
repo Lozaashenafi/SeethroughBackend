@@ -3,7 +3,6 @@ import { nanoid } from 'nanoid';
 import { db, type DatabaseTx } from '../../../database/db.js';
 import { reviews } from '../../../database/schema/review.js';
 import { companies } from '../../../database/schema/company.js';
-import { users } from '../../../database/schema/user.js';
 import { reviewTags } from '../../../database/schema/reviewTag.js';
 import { comments } from '../../../database/schema/comment.js';
 import { reviewVotes } from '../../../database/schema/reviewVote.js';
@@ -39,8 +38,6 @@ const reviewColumns = {
   employmentStatus: reviews.employmentStatus,
   jobTitle: reviews.jobTitle,
   isVerified: reviews.isVerified,
-  showName: reviews.showName,
-  reviewerName: reviews.reviewerName,
   status: reviews.status,
   helpfulCount: reviews.helpfulCount,
   unhelpfulCount: reviews.unhelpfulCount,
@@ -68,24 +65,11 @@ interface ReviewRow {
   employmentStatus: string | null;
   jobTitle: string | null;
   isVerified: boolean;
-  showName: boolean;
-  reviewerName: string | null;
   status: 'published' | 'pending' | 'rejected';
   helpfulCount: number;
   unhelpfulCount: number;
   createdAt: Date;
   updatedAt: Date;
-}
-
-const adminReviewColumns = {
-  ...reviewColumns,
-  authorEmail: users.email,
-  authorDisplayName: users.displayName,
-};
-
-interface AdminReviewRow extends ReviewRow {
-  authorEmail: string;
-  authorDisplayName: string;
 }
 
 export class ReviewsRepository {
@@ -95,17 +79,6 @@ export class ReviewsRepository {
 
   async createWithClient(client: DbClient, input: CreateReviewRecord): Promise<ReviewRow> {
     const publicId = nanoid(16);
-
-    // If showName is true, look up the user's display name to store on the review
-    let reviewerName: string | null = null;
-    if (input.showName) {
-      const [user] = await client
-        .select({ displayName: users.displayName })
-        .from(users)
-        .where(eq(users.id, input.userId))
-        .limit(1);
-      reviewerName = user?.displayName ?? null;
-    }
 
     const [review] = await client
       .insert(reviews)
@@ -126,8 +99,6 @@ export class ReviewsRepository {
         employmentStatus: input.employmentStatus ?? null,
         jobTitle: input.jobTitle ?? null,
         contentFingerprint: input.contentFingerprint,
-        showName: input.showName ?? false,
-        reviewerName,
         status: input.status,
       })
       .returning();
@@ -148,16 +119,6 @@ export class ReviewsRepository {
 
   async findByPublicId(publicId: string): Promise<ReviewRow | null> {
     return this.findByPublicIdWithClient(db, publicId);
-  }
-
-  async findAdminByPublicId(publicId: string): Promise<AdminReviewRow | null> {
-    const [review] = await db
-      .select(adminReviewColumns)
-      .from(reviews)
-      .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .innerJoin(users, eq(reviews.userId, users.id))
-      .where(eq(reviews.publicId, publicId));
-    return review ?? null;
   }
 
   async findByPublicIdWithClient(client: DbClient, publicId: string): Promise<ReviewRow | null> {
@@ -335,8 +296,6 @@ export class ReviewsRepository {
       isCurrentEmployee: boolean | null;
       employmentStatus: string | null;
       jobTitle: string | null;
-      showName: boolean;
-      reviewerName: string | null;
       status: 'published' | 'pending' | 'rejected';
       contentFingerprint: string;
     }>,
@@ -402,7 +361,7 @@ export class ReviewsRepository {
 
   async findAllWithStatus(
     params: { page: number; limit: number; status?: string; sortBy?: string },
-  ): Promise<{ data: AdminReviewRow[]; total: number }> {
+  ): Promise<{ data: ReviewRow[]; total: number }> {
     const offset = (params.page - 1) * params.limit;
 
     const orderBy = params.sortBy === 'engagement'
@@ -416,10 +375,9 @@ export class ReviewsRepository {
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     const data = await db
-      .select(adminReviewColumns)
+      .select(reviewColumns)
       .from(reviews)
       .leftJoin(companies, eq(reviews.companyId, companies.id))
-      .innerJoin(users, eq(reviews.userId, users.id))
       .where(whereClause)
       .orderBy(orderBy)
       .limit(params.limit)

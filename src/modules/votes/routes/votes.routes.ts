@@ -9,11 +9,12 @@ import { createVoteSchema } from '../validation/votes.validation.js';
 
 const votesRoutes = Router();
 
-// Voting requires authenticated user
+// Voting requires authenticated user. Same dual budget as reviews/comments.
 votesRoutes.post(
   '/',
   userAuth({ required: true, enforceActive: true }),
-  createRateLimiter(RATE_LIMITS.REACTION),
+  createRateLimiter(RATE_LIMITS.REACTION, { scope: 'user' }),
+  createRateLimiter(RATE_LIMITS.REACTION_IP),
   validate({ body: createVoteSchema }),
   asyncHandler(votesController.vote.bind(votesController)),
 );

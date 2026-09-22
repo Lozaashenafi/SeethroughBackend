@@ -11,6 +11,7 @@ import {
   listReviewsQuerySchema,
   reviewPublicIdParamsSchema,
   moderateReviewSchema,
+  banAuthorSchema,
 } from '../validation/reviews.validation.js';
 
 const reviewsRoutes = Router();
@@ -48,11 +49,14 @@ reviewsRoutes.put(
   asyncHandler(reviewsController.update.bind(reviewsController)),
 );
 
-// Create a review — requires authenticated user with verified email
+// Create a review — requires authenticated user with verified email.
+// Two parallel budgets: one per account (survives logout/new IP) and one per
+// IP (stops one actor rotating through fresh accounts). Both must pass.
 reviewsRoutes.post(
   '/',
   userAuth({ required: true, verifiedOnly: true, enforceActive: true }),
-  createRateLimiter(RATE_LIMITS.REVIEW_CREATE),
+  createRateLimiter(RATE_LIMITS.REVIEW_CREATE, { scope: 'user' }),
+  createRateLimiter(RATE_LIMITS.REVIEW_CREATE_IP),
   validate({ body: createReviewSchema }),
   asyncHandler(reviewsController.create.bind(reviewsController)),
 );
@@ -80,6 +84,15 @@ reviewsRoutes.patch(
   createRateLimiter(RATE_LIMITS.DEFAULT),
   validate({ params: reviewPublicIdParamsSchema, body: moderateReviewSchema }),
   asyncHandler(reviewsController.moderate.bind(reviewsController)),
+);
+
+// Blind ban — blocks the author of the review. No identity is ever returned.
+reviewsRoutes.patch(
+  '/admin/:publicId/ban-author',
+  userAuth({ adminOnly: true }),
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ params: reviewPublicIdParamsSchema, body: banAuthorSchema }),
+  asyncHandler(reviewsController.banAuthor.bind(reviewsController)),
 );
 
 reviewsRoutes.delete(

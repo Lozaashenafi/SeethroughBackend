@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../../../shared/responses/index.js';
 import { reviewsService } from '../service/reviews.service.js';
-import { toReviewResponse, toAdminReviewResponse } from '../types/reviews.types.js';
+import { toReviewResponse } from '../types/reviews.types.js';
 
 class ReviewsController {
   async create(req: Request, res: Response, _next: NextFunction): Promise<void> {
@@ -33,7 +33,7 @@ class ReviewsController {
   async adminGetByPublicId(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { publicId } = req.params;
     const review = await reviewsService.adminGetByPublicId(publicId);
-    sendSuccess(res, toAdminReviewResponse(review), 'Review retrieved');
+    sendSuccess(res, toReviewResponse(review), 'Review retrieved');
   }
 
   async listByCompany(req: Request, res: Response, _next: NextFunction): Promise<void> {
@@ -83,16 +83,15 @@ class ReviewsController {
     const result = await reviewsService.listAll({ page, limit, sortBy, status });
     sendSuccess(
       res,
-      {
-        reviews: result.data.map(toAdminReviewResponse),
-        pagination: {
-          total: result.total,
-          page,
-          limit,
-          totalPages: Math.ceil(result.total / limit),
+      {        reviews: result.data.map(toReviewResponse),
+          pagination: {
+            total: result.total,
+            page,
+            limit,
+            totalPages: Math.ceil(result.total / limit),
+          },
         },
-      },
-      'All reviews retrieved',
+        'All reviews retrieved',
     );
   }
 
@@ -100,6 +99,22 @@ class ReviewsController {
     const { publicId } = req.params;
     await reviewsService.deleteByPublicId(publicId);
     sendSuccess(res, null, 'Review deleted');
+  }
+
+  /**
+   * Blind ban — blocks the author of the review. The response deliberately
+   * contains no user data, so the admin never learns who was banned.
+   */
+  async banAuthor(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const { banned } = await reviewsService.banAuthor(publicId);
+    sendSuccess(
+      res,
+      { banned },
+      banned
+        ? 'Author banned. They can no longer post reviews, comments or votes.'
+        : 'No action taken — the author could not be banned.',
+    );
   }
 
   async moderate(req: Request, res: Response, _next: NextFunction): Promise<void> {
