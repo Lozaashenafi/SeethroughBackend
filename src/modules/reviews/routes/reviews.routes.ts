@@ -12,9 +12,21 @@ import {
   reviewPublicIdParamsSchema,
   moderateReviewSchema,
   banAuthorSchema,
+  suggestTitleSchema,
 } from '../validation/reviews.validation.js';
 
 const reviewsRoutes = Router();
+
+// AI title suggestion. Authenticated (cheap endpoint, needs an account) with
+// its own daily budget so it cannot be used to drive up AI spend.
+reviewsRoutes.post(
+  '/suggest-title',
+  userAuth({ required: true, enforceActive: true }),
+  createRateLimiter(RATE_LIMITS.TITLE_SUGGEST, { scope: 'user' }),
+  createRateLimiter(RATE_LIMITS.DEFAULT),
+  validate({ body: suggestTitleSchema }),
+  asyncHandler(reviewsController.suggestTitle.bind(reviewsController)),
+);
 
 // Public routes
 reviewsRoutes.get(

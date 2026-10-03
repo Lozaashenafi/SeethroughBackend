@@ -22,6 +22,15 @@ export const reviewPublicIdParamsSchema = z.object({
   publicId: z.string().min(1, 'Review publicId is required'),
 });
 
+// AI title suggestion — only the raw material for the summary is accepted.
+export const suggestTitleSchema = z.object({
+  pros: sanitizedString(undefined, 2000).optional(),
+  cons: sanitizedString(undefined, 2000).optional(),
+  jobTitle: sanitizedString(undefined, 100).optional(),
+  // `auto` = drafted by the form while typing, `manual` = explicit button click.
+  trigger: z.enum(['auto', 'manual']).optional(),
+});
+
 // The author may edit everything except the company the review is attached to.
 // All fields are optional — omitted fields keep their current value.
 export const updateReviewSchema = z.object({

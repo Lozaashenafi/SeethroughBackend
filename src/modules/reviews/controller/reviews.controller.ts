@@ -1,9 +1,24 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../../../shared/responses/index.js';
 import { reviewsService } from '../service/reviews.service.js';
+import { reviewTitleService } from '../service/review-title.service.js';
 import { toReviewResponse } from '../types/reviews.types.js';
 
 class ReviewsController {
+  /**
+   * AI-suggested title from the review's pros/cons. Never throws for upstream
+   * AI failures — the service degrades to a local fallback.
+   */
+  async suggestTitle(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { title, source } = await reviewTitleService.suggestTitle(req.body as {
+      pros?: string;
+      cons?: string;
+      jobTitle?: string;
+      trigger?: 'auto' | 'manual';
+    });
+    sendSuccess(res, { title, source }, 'Title suggested');
+  }
+
   async create(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const review = await reviewsService.create({
       ...req.body,

@@ -34,6 +34,9 @@ const envSchema = z.object({
   // Google OAuth client ID for verifying Google sign-in tokens.
   // Required for Google authentication to work.
   GOOGLE_CLIENT_ID: z.string().optional(),
+  // SambaNova Cloud API key (OpenAI-compatible) for AI review-title generation.
+  // If unset, the suggest-title endpoint falls back to a local heuristic.
+  SAMBANOVA_API_KEY: z.string().optional(),
 });
 
 function validateEnv() {

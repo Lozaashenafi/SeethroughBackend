@@ -25,5 +25,11 @@ export const RATE_LIMITS = {
   REPORT: { windowMs: 24 * 60 * 60 * 1000, max: 10 },
   REPORT_IP: { windowMs: 24 * 60 * 60 * 1000, max: 30 },
   UPLOAD: { windowMs: 24 * 60 * 60 * 1000, max: 20 },
+  // AI title suggestions — small daily budget because each call costs money.
+  TITLE_SUGGEST: {
+    windowMs: 24 * 60 * 60 * 1000,
+    max: 15,
+    message: 'You have reached the AI title suggestion limit for today. You can still write the title yourself.',
+  },
   DEFAULT: { windowMs: 15 * 60 * 1000, max: 100 },
 } as const;
