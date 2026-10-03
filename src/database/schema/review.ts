@@ -34,6 +34,9 @@ export const reviews = pgTable(
     employmentStatus: text('employment_status', {
       enum: ['full-time', 'part-time', 'contract', 'intern', 'freelance'],
     }),
+    tenure: text('tenure', {
+      enum: ['under-1-year', '1-2-years', '3-5-years', '6-10-years', '10-plus-years'],
+    }),
     jobTitle: text('job_title'),
     isVerified: boolean('is_verified').default(false).notNull(),
     contentFingerprint: text('content_fingerprint'),

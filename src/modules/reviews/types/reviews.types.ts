@@ -11,6 +11,7 @@ export interface CreateReviewInput {
   opportunities?: number;
   isCurrentEmployee?: boolean;
   employmentStatus?: 'full-time' | 'part-time' | 'contract' | 'intern' | 'freelance';
+  tenure?: 'under-1-year' | '1-2-years' | '3-5-years' | '6-10-years' | '10-plus-years';
   jobTitle?: string;
   tagIds?: number[];
 }
@@ -36,6 +37,7 @@ export interface ReviewResponse {
   opportunities: number | null;
   isCurrentEmployee: boolean | null;
   employmentStatus: string | null;
+  tenure: string | null;
   jobTitle: string | null;
   isVerified: boolean;
   status: 'published' | 'pending' | 'rejected';
@@ -61,6 +63,7 @@ export function toReviewResponse(review: {
   opportunities: number | null;
   isCurrentEmployee: boolean | null;
   employmentStatus: string | null;
+  tenure: string | null;
   jobTitle: string | null;
   isVerified: boolean;
   status: 'published' | 'pending' | 'rejected';
@@ -85,6 +88,7 @@ export function toReviewResponse(review: {
     opportunities: review.opportunities,
     isCurrentEmployee: review.isCurrentEmployee,
     employmentStatus: review.employmentStatus,
+    tenure: review.tenure,
     jobTitle: review.jobTitle,
     isVerified: review.isVerified,
     status: review.status,

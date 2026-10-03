@@ -115,6 +115,7 @@ class ReviewsService {
         opportunities: input.opportunities,
         isCurrentEmployee: input.isCurrentEmployee,
         employmentStatus: input.employmentStatus,
+        tenure: input.tenure,
         jobTitle: input.jobTitle,
         tagIds: input.tagIds,
         status,
@@ -182,6 +183,7 @@ class ReviewsService {
       opportunities: input.opportunities ?? review.opportunities,
       isCurrentEmployee: input.isCurrentEmployee ?? review.isCurrentEmployee,
       employmentStatus: input.employmentStatus ?? review.employmentStatus,
+      tenure: input.tenure ?? review.tenure,
       jobTitle: input.jobTitle ?? review.jobTitle,
     };
 

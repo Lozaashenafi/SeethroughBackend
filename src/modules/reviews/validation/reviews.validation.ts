@@ -14,6 +14,7 @@ export const createReviewSchema = z.object({
   opportunities: z.number().int().min(1).max(5).optional(),
   isCurrentEmployee: z.boolean().optional(),
   employmentStatus: z.enum(['full-time', 'part-time', 'contract', 'intern', 'freelance']).optional(),
+  tenure: z.enum(['under-1-year', '1-2-years', '3-5-years', '6-10-years', '10-plus-years']).optional(),
   jobTitle: sanitizedString(undefined, 100).optional(),
   tagIds: z.array(z.number().int().positive()).max(10).optional(),
 });
@@ -47,6 +48,7 @@ export const updateReviewSchema = z.object({
   employmentStatus: z
     .enum(['full-time', 'part-time', 'contract', 'intern', 'freelance'])
     .optional(),
+  tenure: z.enum(['under-1-year', '1-2-years', '3-5-years', '6-10-years', '10-plus-years']).optional(),
   jobTitle: sanitizedString(undefined, 100).optional(),
   tagIds: z.array(z.number().int().positive()).max(10).optional(),
 });

@@ -339,6 +339,7 @@ async function seed(): Promise<void> {
         overallRating: review.overallRating,
         isCurrentEmployee: true,
         employmentStatus: 'full-time',
+        tenure: '3-5-years',
         jobTitle: 'Software Engineer',
       }).onConflictDoNothing().returning();
 
@@ -355,18 +356,22 @@ async function seed(): Promise<void> {
   logger.info('  Consolidating stats...');
   const finalCompanies = await db.select().from(companies);
   for (const company of finalCompanies) {
-    const companyReviews = await db.select().from(reviews).where(eq(reviews.companyId, company.id));
-    if (companyReviews.length === 0) continue;
+    const companyReviews = (await db.select().from(reviews).where(eq(reviews.companyId, company.id))).filter(
+      (r) => r.status === 'published',
+    );
 
     const ratings = companyReviews
       .map((r) => r.overallRating)
       .filter((r): r is number => r !== null && r !== undefined);
-    if (ratings.length === 0) continue;
-    const avg = (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1);
+
+    // Recommended % = share of rated reviews scoring 4 or 5 stars.
+    const recommendationRate =
+      ratings.length > 0 ? Math.round((ratings.filter((r) => r >= 4).length / ratings.length) * 100) : 0;
 
     await db.update(companies).set({
       reviewCount: companyReviews.length,
-      averageRating: avg,
+      averageRating: ratings.length > 0 ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : null,
+      recommendationRate,
     }).where(eq(companies.id, company.id));
   }
 

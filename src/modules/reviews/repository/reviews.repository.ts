@@ -36,6 +36,7 @@ const reviewColumns = {
   opportunities: reviews.opportunities,
   isCurrentEmployee: reviews.isCurrentEmployee,
   employmentStatus: reviews.employmentStatus,
+  tenure: reviews.tenure,
   jobTitle: reviews.jobTitle,
   isVerified: reviews.isVerified,
   status: reviews.status,
@@ -63,6 +64,7 @@ interface ReviewRow {
   opportunities: number | null;
   isCurrentEmployee: boolean | null;
   employmentStatus: string | null;
+  tenure: string | null;
   jobTitle: string | null;
   isVerified: boolean;
   status: 'published' | 'pending' | 'rejected';
@@ -97,6 +99,7 @@ export class ReviewsRepository {
         opportunities: input.opportunities ?? null,
         isCurrentEmployee: input.isCurrentEmployee ?? null,
         employmentStatus: input.employmentStatus ?? null,
+        tenure: input.tenure ?? null,
         jobTitle: input.jobTitle ?? null,
         contentFingerprint: input.contentFingerprint,
         status: input.status,
@@ -295,6 +298,7 @@ export class ReviewsRepository {
       opportunities: number | null;
       isCurrentEmployee: boolean | null;
       employmentStatus: string | null;
+      tenure: string | null;
       jobTitle: string | null;
       status: 'published' | 'pending' | 'rejected';
       contentFingerprint: string;
@@ -430,7 +434,9 @@ export class ReviewsRepository {
       .select({
         averageRating: sql<string>`round(avg(${reviews.overallRating}), 1)::text`,
         reviewCount: count(),
-        recommendationRate: sql<number>`round((count(*) FILTER (WHERE ${reviews.isCurrentEmployee} = true)::numeric / nullif(count(*), 0)) * 100)::int`,
+        // "Recommended" = share of rated reviews scoring 4 or 5 stars. Only
+        // reviews that actually carry a rating enter the denominator.
+        recommendationRate: sql<number>`coalesce(round((count(*) FILTER (WHERE ${reviews.overallRating} >= 4)::numeric / nullif(count(*) FILTER (WHERE ${reviews.overallRating} IS NOT NULL), 0)) * 100)::int, 0)`,
       })
       .from(reviews)
       .where(and(eq(reviews.companyId, companyId), eq(reviews.status, 'published')));
