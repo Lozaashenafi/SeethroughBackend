@@ -4,7 +4,7 @@ import { adminUsersService } from '../service/adminUsers.service.js';
 
 class AdminUsersController {
   async list(req: Request, res: Response, _next: NextFunction): Promise<void> {
-    const { search, role, status, page, limit } = req.query as Record<
+    const { search, role, status, isGuest, page, limit } = req.query as Record<
       string,
       string | undefined
     >;
@@ -13,6 +13,7 @@ class AdminUsersController {
       search: search || undefined,
       role: (role as 'user' | 'admin' | 'all') || 'all',
       status: (status as 'active' | 'blocked' | 'restricted' | 'all') || 'all',
+      isGuest: (isGuest as 'account' | 'guest' | 'all') || 'account',
       page: Number(page) || 1,
       limit: Number(limit) || 20,
     });

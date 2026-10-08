@@ -430,13 +430,27 @@ export class ReviewsRepository {
     // Aggregate in SQL so we never pull every review row into memory. Only
     // published reviews contribute to the public stats — pending/rejected
     // content must never move the averages or counts.
+    //
+    // "Recommended" is meant as "the reviewer would recommend this company",
+    // which is NOT the same as the stored star rating. The review form derives
+    // `overall_rating` by rounding the average of the five category ratings, so
+    // that integer loses precision in both directions (3.8 is stored as 4, 4.4
+    // is stored as 4): deciding off it lets a lukewarm 3.8 review count as a
+    // recommendation. The category ratings themselves are therefore the source
+    // of truth, and the stored overall rating is only used as a fallback for
+    // rows that carry no category ratings at all (seed/legacy data).
+    const categorySum = sql`(coalesce(${reviews.workLifeBalance}, 0) + coalesce(${reviews.culture}, 0) + coalesce(${reviews.management}, 0) + coalesce(${reviews.compensation}, 0) + coalesce(${reviews.opportunities}, 0))`;
+    const categoryCount = sql`((${reviews.workLifeBalance} IS NOT NULL)::int + (${reviews.culture} IS NOT NULL)::int + (${reviews.management} IS NOT NULL)::int + (${reviews.compensation} IS NOT NULL)::int + (${reviews.opportunities} IS NOT NULL)::int)`;
+    // A review is rated when it has either kind of rating; only rated reviews
+    // enter the recommendation denominator.
+    const isRated = sql`(${reviews.overallRating} IS NOT NULL OR ${categoryCount} > 0)`;
+    const isRecommended = sql`((${categoryCount} > 0 AND ${categorySum}::numeric / ${categoryCount} >= 4) OR (${categoryCount} = 0 AND ${reviews.overallRating} >= 4))`;
+
     const [result] = await client
       .select({
         averageRating: sql<string>`round(avg(${reviews.overallRating}), 1)::text`,
         reviewCount: count(),
-        // "Recommended" = share of rated reviews scoring 4 or 5 stars. Only
-        // reviews that actually carry a rating enter the denominator.
-        recommendationRate: sql<number>`coalesce(round((count(*) FILTER (WHERE ${reviews.overallRating} >= 4)::numeric / nullif(count(*) FILTER (WHERE ${reviews.overallRating} IS NOT NULL), 0)) * 100)::int, 0)`,
+        recommendationRate: sql<number>`coalesce(round((count(*) FILTER (WHERE ${isRecommended})::numeric / nullif(count(*) FILTER (WHERE ${isRated}), 0)) * 100)::int, 0)`,
       })
       .from(reviews)
       .where(and(eq(reviews.companyId, companyId), eq(reviews.status, 'published')));

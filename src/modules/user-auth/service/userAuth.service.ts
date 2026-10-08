@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { userAuthRepository } from '../repository/userAuth.repository.js';
 import { AppError } from '../../../shared/errors/AppError.js';
 import { env } from '../../../config/env.js';
+import { GUEST_SESSION_TTL_MS } from '../../../shared/constants/index.js';
 import { tokenBlocklist } from '../../../shared/utils/tokenBlocklist.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../../../services/email.service.js';
 import type { UserJwtPayload, UserProfile } from '../types/userAuth.types.js';
@@ -327,6 +328,25 @@ class UserAuthService {
     }
     const passwordHash = await bcrypt.hash(newPassword, 12);
     await userAuthRepository.updatePassword(userId, passwordHash);
+  }
+
+  /**
+   * Issue the signed device cookie for an anonymous poster. The token carries
+   * `isGuest` so `userAuth` can reject it and only `guestAuth` will honour it.
+   */
+  generateGuestToken(guestUserId: string): string {
+    const payload: UserJwtPayload = {
+      jti: randomBytes(16).toString('hex'),
+      userId: guestUserId,
+      email: '',
+      displayName: 'Anonymous',
+      role: 'guest',
+      isGuest: true,
+    };
+
+    return jwt.sign(payload, env.JWT_SECRET, {
+      expiresIn: Math.floor(GUEST_SESSION_TTL_MS / 1000),
+    });
   }
 
   private generateToken(userId: string, email: string, displayName: string, role: string): string {

@@ -24,6 +24,7 @@ interface ListParams {
   search?: string;
   role: 'user' | 'admin' | 'all';
   status: 'active' | 'blocked' | 'restricted' | 'all';
+  isGuest: 'account' | 'guest' | 'all';
 }
 
 class AdminUsersService {

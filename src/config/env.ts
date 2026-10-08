@@ -31,6 +31,10 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().optional(),
   // Frontend URL for building email links (e.g. verification, password reset).
   FRONTEND_URL: z.string().default('http://localhost:5173'),
+  // Optional comma-separated recipients for review moderation alert emails
+  // (e.g. a team inbox). When unset, alerts go to every verified admin account
+  // in the database instead.
+  ADMIN_ALERT_EMAILS: z.string().optional(),
   // Google OAuth client ID for verifying Google sign-in tokens.
   // Required for Google authentication to work.
   GOOGLE_CLIENT_ID: z.string().optional(),

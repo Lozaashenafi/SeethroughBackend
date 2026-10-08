@@ -53,6 +53,17 @@ export function userAuth(options?: {
 
       const payload = userAuthService.verifyToken(token);
 
+      // A guest device token must never authenticate as a real account, even if
+      // someone copies it into the `user_token` cookie. Guest access goes
+      // through `guestAuth` instead.
+      if (payload.isGuest || payload.role === 'guest') {
+        if (options?.required || options?.adminOnly) {
+          sendError(res, 'Authentication required. Please log in.', 401);
+          return;
+        }
+        return next();
+      }
+
       // The profile is only fetched when an option needs more than the JWT
       // claims carry (moderation state, email verification, role).
       let profile: Awaited<ReturnType<typeof userAuthRepository.findById>> = null;

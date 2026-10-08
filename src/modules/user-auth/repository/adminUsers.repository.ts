@@ -28,6 +28,7 @@ const adminUserColumns = {
   displayName: users.displayName,
   role: users.role,
   emailVerified: users.emailVerified,
+  isGuest: users.isGuest,
   isBlocked: users.isBlocked,
   blockedAt: users.blockedAt,
   tempBlockedUntil: users.tempBlockedUntil,
@@ -41,6 +42,7 @@ interface AdminUserRow {
   displayName: string;
   role: string;
   emailVerified: boolean;
+  isGuest: boolean;
   isBlocked: boolean;
   blockedAt: Date | null;
   tempBlockedUntil: Date | null;
@@ -54,6 +56,8 @@ interface ListAdminUsersParams {
   search?: string;
   role: 'user' | 'admin' | 'all';
   status: 'active' | 'blocked' | 'restricted' | 'all';
+  /** `account` (default) hides anonymous guest rows; `guest` shows only them. */
+  isGuest: 'account' | 'guest' | 'all';
 }
 
 export class AdminUsersRepository {
@@ -65,6 +69,12 @@ export class AdminUsersRepository {
 
     if (params.role !== 'all') {
       conditions.push(eq(users.role, params.role));
+    }
+
+    if (params.isGuest === 'guest') {
+      conditions.push(eq(users.isGuest, true));
+    } else if (params.isGuest === 'account') {
+      conditions.push(eq(users.isGuest, false));
     }
 
     // `active` means "can post right now": not blocked and not currently
@@ -151,6 +161,72 @@ export class AdminUsersRepository {
 
     await this.setBlocked(user.id, true);
     return { banned: true };
+  }
+
+  /**
+   * Moderation state of a review's author, with no identity attached. The
+   * author of an anonymous review is a guest row, and guest rows are hidden
+   * from the default Users list — so the admin UI needs this to offer the
+   * inverse of a blind ban from the review itself. `canModerate` mirrors the
+   * guard in `blockAuthorOfReview`: an admin author is never bannable.
+   */
+  async getAuthorStatusOfReview(reviewPublicId: string): Promise<{
+    canModerate: boolean;
+    isBlocked: boolean;
+    isGuest: boolean;
+    tempBlockedUntil: Date | null;
+  } | null> {
+    const [review] = await db
+      .select({ userId: reviews.userId })
+      .from(reviews)
+      .where(eq(reviews.publicId, reviewPublicId))
+      .limit(1);
+    if (!review) return null;
+
+    const [user] = await db
+      .select({
+        role: users.role,
+        isBlocked: users.isBlocked,
+        isGuest: users.isGuest,
+        tempBlockedUntil: users.tempBlockedUntil,
+      })
+      .from(users)
+      .where(eq(users.id, review.userId))
+      .limit(1);
+    if (!user) return null;
+
+    return {
+      canModerate: user.role !== 'admin',
+      isBlocked: user.isBlocked,
+      isGuest: user.isGuest,
+      tempBlockedUntil: user.tempBlockedUntil,
+    };
+  }
+
+  /**
+   * Blind unban — the exact inverse of `blockAuthorOfReview`, with the same
+   * identity-free contract: the caller supplies only a review's publicId and
+   * learns only whether a block was lifted. `unbanned` is false when there was
+   * nothing to undo (author gone, an admin, or not blocked), so the UI can be
+   * honest instead of claiming a change that never happened.
+   */
+  async unblockAuthorOfReview(reviewPublicId: string): Promise<{ unbanned: boolean }> {
+    const [review] = await db
+      .select({ userId: reviews.userId })
+      .from(reviews)
+      .where(eq(reviews.publicId, reviewPublicId))
+      .limit(1);
+    if (!review) return { unbanned: false };
+
+    const [user] = await db
+      .select({ id: users.id, role: users.role, isBlocked: users.isBlocked })
+      .from(users)
+      .where(eq(users.id, review.userId))
+      .limit(1);
+    if (!user || user.role === 'admin' || !user.isBlocked) return { unbanned: false };
+
+    await this.setBlocked(user.id, false);
+    return { unbanned: true };
   }
 
   async setBlocked(id: string, blocked: boolean): Promise<AdminUserRow | null> {

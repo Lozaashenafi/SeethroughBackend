@@ -23,6 +23,8 @@ class ReviewsController {
     const review = await reviewsService.create({
       ...req.body,
       userId: req.user!.userId,
+      // Guest submissions are held for moderation (see reviewsService.create).
+      isGuest: req.user!.isGuest === true,
     });
     sendSuccess(res, toReviewResponse(review), 'Review created', 201);
   }
@@ -47,8 +49,11 @@ class ReviewsController {
 
   async adminGetByPublicId(req: Request, res: Response, _next: NextFunction): Promise<void> {
     const { publicId } = req.params;
-    const review = await reviewsService.adminGetByPublicId(publicId);
-    sendSuccess(res, toReviewResponse(review), 'Review retrieved');
+    const { review, authorStatus } = await reviewsService.adminGetByPublicId(publicId);
+    // `authorStatus` is admin-only and identity-free — it carries no id, email
+    // or name, just whether the author can currently post. Attached here rather
+    // than in the shared mapper so it can never reach a public response.
+    sendSuccess(res, { ...toReviewResponse(review), authorStatus }, 'Review retrieved');
   }
 
   async listByCompany(req: Request, res: Response, _next: NextFunction): Promise<void> {
@@ -129,6 +134,22 @@ class ReviewsController {
       banned
         ? 'Author banned. They can no longer post reviews, comments or votes.'
         : 'No action taken — the author could not be banned.',
+    );
+  }
+
+  /**
+   * Blind unban — the inverse of `banAuthor`. Lifts the block on the review's
+   * author, again without ever revealing who they are.
+   */
+  async unbanAuthor(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const { publicId } = req.params;
+    const { unbanned } = await reviewsService.unbanAuthor(publicId);
+    sendSuccess(
+      res,
+      { unbanned },
+      unbanned
+        ? 'Author unblocked. They can post reviews, comments and votes again.'
+        : 'No action taken — the author was not blocked.',
     );
   }
 

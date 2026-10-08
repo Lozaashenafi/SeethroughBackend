@@ -1,6 +1,7 @@
 import { reviewsRepository } from '../repository/reviews.repository.js';
 import { companiesRepository } from '../../companies/repository/companies.repository.js';
 import { adminUsersRepository } from '../../user-auth/repository/adminUsers.repository.js';
+import { reviewModerationAlertService } from './review-moderation-alert.service.js';
 import { AppError } from '../../../shared/errors/AppError.js';
 import {
   contentFingerprint,
@@ -29,7 +30,7 @@ const DUP_SCREEN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const DUP_SCREEN_LIMIT = 200;
 
 class ReviewsService {
-  async create(input: CreateReviewInput & { userId: string }) {
+  async create(input: CreateReviewInput & { userId: string; isGuest?: boolean }) {
     // Verify company exists (lookup by slug)
     const company = await companiesRepository.findBySlug(input.companySlug);
     if (!company) {
@@ -81,20 +82,27 @@ class ReviewsService {
       throw new AppError('This review appears to be a duplicate. If this was a mistake, please try again.', 409);
     }
 
-    let status: 'published' | 'pending' | 'rejected' = 'published';
-    const recentPublished = await reviewsRepository.findRecentForDupCheck(
-      new Date(Date.now() - DUP_SCREEN_WINDOW_MS),
-      DUP_SCREEN_LIMIT,
-    );
-    const nearDup = recentPublished.find(
-      (r) =>
-        textSimilarity(input.title, r.title) >= NEAR_DUPLICATE_THRESHOLD ||
-        textSimilarity(input.pros ?? '', r.pros ?? '') >= NEAR_DUPLICATE_THRESHOLD ||
-        textSimilarity(input.cons ?? '', r.cons ?? '') >= NEAR_DUPLICATE_THRESHOLD,
-    );
+    // Anonymous (guest) reviews are always held for moderation. Signed-in
+    // accounts publish immediately unless the content looks near-duplicate.
+    let status: 'published' | 'pending' | 'rejected' = input.isGuest
+      ? 'pending'
+      : 'published';
 
-    if (nearDup) {
-      status = 'pending';
+    if (!input.isGuest) {
+      const recentPublished = await reviewsRepository.findRecentForDupCheck(
+        new Date(Date.now() - DUP_SCREEN_WINDOW_MS),
+        DUP_SCREEN_LIMIT,
+      );
+      const nearDup = recentPublished.find(
+        (r) =>
+          textSimilarity(input.title, r.title) >= NEAR_DUPLICATE_THRESHOLD ||
+          textSimilarity(input.pros ?? '', r.pros ?? '') >= NEAR_DUPLICATE_THRESHOLD ||
+          textSimilarity(input.cons ?? '', r.cons ?? '') >= NEAR_DUPLICATE_THRESHOLD,
+      );
+
+      if (nearDup) {
+        status = 'pending';
+      }
     }
 
     // Review insert, tag links and company stats update are committed
@@ -130,6 +138,17 @@ class ReviewsService {
 
       return created;
     });
+
+    // A review that is held for moderation is invisible until an admin decides,
+    // so the moderators are told about it right away — with a link that opens
+    // the approve/reject screen. Runs after the commit and never throws: a mail
+    // failure must not fail the review the reviewer just posted.
+    if (status === 'pending') {
+      await reviewModerationAlertService.notifyPendingReview(
+        review,
+        input.isGuest ? 'anonymous' : 'possible-duplicate',
+      );
+    }
 
     return review;
   }
@@ -279,7 +298,11 @@ class ReviewsService {
     if (!review) {
       throw new AppError('Review not found', 404);
     }
-    return review;
+    // Author moderation state, admin-only and identity-free. It lets the review
+    // page offer the inverse of a blind ban in place: the author of an anonymous
+    // review is a guest row, which never appears in the default Users list.
+    const authorStatus = await adminUsersRepository.getAuthorStatusOfReview(publicId);
+    return { review, authorStatus };
   }
 
   async listByCompanySlug(companySlug: string, page: number, limit: number, sortBy?: string) {
@@ -330,6 +353,19 @@ class ReviewsService {
       throw new AppError('Review not found', 404);
     }
     return adminUsersRepository.blockAuthorOfReview(publicId);
+  }
+
+  /**
+   * Undo a blind ban on a review's author — the inverse of `banAuthor`, with
+   * the same anonymity: the admin supplies only the review's publicId and is
+   * never told who was unbanned.
+   */
+  async unbanAuthor(publicId: string): Promise<{ unbanned: boolean }> {
+    const review = await reviewsRepository.findByPublicId(publicId);
+    if (!review) {
+      throw new AppError('Review not found', 404);
+    }
+    return adminUsersRepository.unblockAuthorOfReview(publicId);
   }
 
   async moderate(publicId: string, status: 'published' | 'rejected') {

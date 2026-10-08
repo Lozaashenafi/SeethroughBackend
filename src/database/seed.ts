@@ -8,6 +8,8 @@ import { companies } from './schema/company.js';
 import { users } from './schema/user.js';
 import { reviews } from './schema/review.js';
 import { reviewTags } from './schema/reviewTag.js';
+import { reviewsRepository } from '../modules/reviews/repository/reviews.repository.js';
+import { companiesRepository } from '../modules/companies/repository/companies.repository.js';
 import { logger } from '../config/logger.js';
 
 const SEED_ADMIN_EMAIL = 'admin@seethrough.com';
@@ -354,25 +356,13 @@ async function seed(): Promise<void> {
 
   // ─── 8. Consolidate Stats ───
   logger.info('  Consolidating stats...');
-  const finalCompanies = await db.select().from(companies);
+  const finalCompanies = await db.select({ id: companies.id }).from(companies);
   for (const company of finalCompanies) {
-    const companyReviews = (await db.select().from(reviews).where(eq(reviews.companyId, company.id))).filter(
-      (r) => r.status === 'published',
-    );
-
-    const ratings = companyReviews
-      .map((r) => r.overallRating)
-      .filter((r): r is number => r !== null && r !== undefined);
-
-    // Recommended % = share of rated reviews scoring 4 or 5 stars.
-    const recommendationRate =
-      ratings.length > 0 ? Math.round((ratings.filter((r) => r >= 4).length / ratings.length) * 100) : 0;
-
-    await db.update(companies).set({
-      reviewCount: companyReviews.length,
-      averageRating: ratings.length > 0 ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : null,
-      recommendationRate,
-    }).where(eq(companies.id, company.id));
+    // Recomputed through the same repository the API uses, so the seed can
+    // never disagree with what the app shows (published-only, and "Recommended"
+    // derived from the category ratings rather than the rounded star value).
+    const stats = await reviewsRepository.getCompanyReviewStats(company.id);
+    await companiesRepository.updateStats(company.id, stats);
   }
 
   logger.info('✅ Seed complete!');

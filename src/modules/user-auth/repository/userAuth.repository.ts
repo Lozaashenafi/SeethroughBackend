@@ -1,4 +1,5 @@
 import { eq, or, isNull, and, gt } from 'drizzle-orm';
+import { randomBytes } from 'node:crypto';
 import { db } from '../../../database/db.js';
 import { users } from '../../../database/schema/user.js';
 import type { UserProfile } from '../types/userAuth.types.js';
@@ -18,6 +19,7 @@ interface UserRow {
   isBlocked: boolean;
   blockedAt: Date | null;
   tempBlockedUntil: Date | null;
+  isGuest: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +34,7 @@ export class UserAuthRepository {
     verificationToken?: string;
     verificationExpiresAt?: Date;
     role?: 'user' | 'admin';
+    isGuest?: boolean;
   }): Promise<UserProfile> {
     const [user] = await db
       .insert(users)
@@ -44,6 +47,7 @@ export class UserAuthRepository {
         verificationToken: input.verificationToken ?? null,
         verificationExpiresAt: input.verificationExpiresAt ?? null,
         role: input.role ?? 'user',
+        isGuest: input.isGuest ?? false,
       })
       .returning({
         id: users.id,
@@ -73,12 +77,53 @@ export class UserAuthRepository {
     return user ?? null;
   }
 
+  /**
+   * Admin accounts that should receive moderation alert emails.
+   *
+   * Only verified, unblocked real accounts qualify: a guest row has no inbox
+   * (its email is a placeholder), an unverified address cannot receive the
+   * alert reliably, and a blocked admin is no longer moderating.
+   */
+  async findModerationAlertRecipients(): Promise<string[]> {
+    const rows = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(
+        and(
+          eq(users.role, 'admin'),
+          eq(users.emailVerified, true),
+          eq(users.isGuest, false),
+          eq(users.isBlocked, false),
+        ),
+      );
+    return rows.map((row) => row.email);
+  }
+
   async findById(id: string): Promise<UserRow | null> {
     const [user] = await db
       .select()
       .from(users)
       .where(eq(users.id, id));
     return user ?? null;
+  }
+
+  /**
+   * Create the anonymous identity behind a device. A guest has no email,
+   * password or Google id, is never verified, and cannot log in — it exists
+   * only so anonymous content has an author that can be moderated.
+   */
+  async createGuest(): Promise<UserRow> {
+    const email = `guest_${randomBytes(16).toString('hex')}@guest.local`;
+    const [user] = await db
+      .insert(users)
+      .values({
+        email,
+        displayName: 'Anonymous',
+        emailVerified: false,
+        isGuest: true,
+      })
+      .returning();
+    return user;
   }
 
   async findByGoogleId(googleId: string): Promise<UserRow | null> {

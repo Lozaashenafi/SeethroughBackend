@@ -65,6 +65,7 @@ export const moderateReviewSchema = z.object({
   status: z.enum(['published', 'rejected']),
 });
 
-// Blind ban takes no body — the author is resolved server-side from the
-// review's publicId and their identity is never returned.
+// Blind ban (and its inverse, blind unban) take no body — the author is
+// resolved server-side from the review's publicId and their identity is never
+// returned in either direction.
 export const banAuthorSchema = z.object({}).strict();

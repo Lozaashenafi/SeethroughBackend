@@ -1,4 +1,5 @@
 import rateLimit from 'express-rate-limit';
+import type { Request, Response, NextFunction } from 'express';
 
 interface RateLimiterOptions {
   windowMs?: number;
@@ -40,4 +41,22 @@ export function createRateLimiter(
     standardHeaders: true,
     legacyHeaders: false,
   });
+}
+
+/**
+ * Builds one limiter that dispatches to a tighter budget for anonymous guests
+ * and a looser one for signed-in accounts. Must run after `guestAuth`, so that
+ * `req.user` (and therefore the correct budget) is already resolved.
+ */
+export function createActorRateLimiter(
+  userOptions: RateLimiterOptions,
+  guestOptions: RateLimiterOptions,
+) {
+  const userLimiter = createRateLimiter(userOptions, { scope: 'user' });
+  const guestLimiter = createRateLimiter(guestOptions, { scope: 'user' });
+
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const limiter = req.user?.isGuest ? guestLimiter : userLimiter;
+    limiter(req, res, next);
+  };
 }

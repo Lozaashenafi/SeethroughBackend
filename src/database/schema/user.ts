@@ -18,6 +18,12 @@ export const users = pgTable(
     googleId: varchar('google_id', { length: 255 }).unique(),
     role: text('role', { enum: ['user', 'admin'] }).default('user').notNull(),
     emailVerified: boolean('email_verified').default(false).notNull(),
+    // Guest rows are created automatically the first time a device posts
+    // anonymously. They have no email/password, can never log in, and own no
+    // profile — they exist only so an anonymous review/comment/vote still has
+    // an author that can be moderated (blind-banned) without ever revealing a
+    // real identity.
+    isGuest: boolean('is_guest').default(false).notNull(),
     verificationToken: varchar('verification_token', { length: 255 }),
     verificationExpiresAt: timestamp('verification_expires_at', {
       withTimezone: true,

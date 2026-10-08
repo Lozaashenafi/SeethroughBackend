@@ -18,6 +18,7 @@ export interface AdminUserResponse {
   displayName: string;
   role: string;
   emailVerified: boolean;
+  isGuest: boolean;
   isBlocked: boolean;
   blockedAt: Date | null;
   tempBlockedUntil: Date | null;
@@ -94,6 +95,7 @@ export function toAdminUserResponse(user: {
   displayName: string;
   role: string;
   emailVerified: boolean;
+  isGuest: boolean;
   isBlocked: boolean;
   blockedAt: Date | null;
   tempBlockedUntil: Date | null;
@@ -106,6 +108,7 @@ export function toAdminUserResponse(user: {
     displayName: user.displayName,
     role: user.role,
     emailVerified: user.emailVerified,
+    isGuest: user.isGuest,
     isBlocked: user.isBlocked,
     blockedAt: user.blockedAt,
     tempBlockedUntil: user.tempBlockedUntil,

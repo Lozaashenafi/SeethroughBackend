@@ -4,6 +4,12 @@ export interface UserJwtPayload {
   email: string;
   displayName: string;
   role: string;
+  /**
+   * True when this payload belongs to an anonymous device identity rather than
+   * a real account. Guest tokens are issued by `guestAuth` and are deliberately
+   * rejected by `userAuth`, so they can never act as an authenticated user.
+   */
+  isGuest?: boolean;
 }
 
 export interface UserProfile {

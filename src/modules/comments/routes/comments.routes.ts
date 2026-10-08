@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { commentsController } from '../controller/comments.controller.js';
-import { userAuth } from '../../../middlewares/userAuth.middleware.js';
-import { createRateLimiter } from '../../../middlewares/rateLimiter.middleware.js';
+import { guestAuth } from '../../../middlewares/guestAuth.middleware.js';
+import {
+  createRateLimiter,
+  createActorRateLimiter,
+} from '../../../middlewares/rateLimiter.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { asyncHandler } from '../../../shared/utils/index.js';
 import { RATE_LIMITS } from '../../../shared/constants/index.js';
@@ -17,13 +20,13 @@ commentsRoutes.get(
   asyncHandler(commentsController.listByReview.bind(commentsController)),
 );
 
-// Posting comments requires authenticated user. Same dual budget as reviews:
-// account-scoped plus IP-scoped.
+// Posting comments is open to anyone. Anonymous comments use a tighter
+// per-device budget; the IP budget runs first so a flood cannot mint guests.
 commentsRoutes.post(
   '/',
-  userAuth({ required: true, enforceActive: true }),
-  createRateLimiter(RATE_LIMITS.COMMENT_CREATE, { scope: 'user' }),
   createRateLimiter(RATE_LIMITS.COMMENT_CREATE_IP),
+  guestAuth({ enforceActive: true }),
+  createActorRateLimiter(RATE_LIMITS.COMMENT_CREATE, RATE_LIMITS.COMMENT_CREATE_GUEST),
   validate({ body: createCommentSchema }),
   asyncHandler(commentsController.create.bind(commentsController)),
 );

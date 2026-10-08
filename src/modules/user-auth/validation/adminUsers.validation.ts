@@ -6,6 +6,9 @@ export const listAdminUsersQuerySchema = z.object({
   search: z.string().trim().max(200).optional(),
   role: z.enum(['user', 'admin', 'all']).optional().default('all'),
   status: z.enum(['active', 'blocked', 'restricted', 'all']).optional().default('all'),
+  // Anonymous guest rows are numerous and are moderated from the review queue,
+  // so they are hidden from the default account view.
+  isGuest: z.enum(['account', 'guest', 'all']).optional().default('account'),
 });
 
 export const adminUserParamsSchema = z.object({
